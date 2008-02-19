@@ -1,7 +1,7 @@
 /*
- * $HeadURL$
- * $Revision$
- * $Date$
+ * $HeadURL:$
+ * $Revision:$
+ * $Date:$
  *
  * ====================================================================
  * Licensed to the Apache Software Foundation (ASF) under one
@@ -32,35 +32,31 @@
 package org.apache.http.nio.entity;
 
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
-import java.nio.channels.Channels;
-import java.nio.channels.ReadableByteChannel;
+import java.io.InputStream;
+import java.io.OutputStream;
 
-import org.apache.http.HttpEntity;
-import org.apache.http.entity.StringEntity;
+import org.apache.http.entity.AbstractHttpEntity;
 
 /**
- * An entity whose content is retrieved from a string. In addition to the 
- * standard {@link HttpEntity} interface this class also implements NIO specific 
- * {@link HttpNIOEntity}.
- *
- * @author <a href="mailto:oleg at ural.ru">Oleg Kalnichevski</a>
- *
- * @version $Revision$
- * 
- * @since 4.0
+ * An abstract implementation of {@link NHttpEntity} that stubs out all blocking
+ * methods, throwing an {@link UnsupportedOperationException}.
  */
-@Deprecated
-public class StringNIOEntity extends StringEntity implements HttpNIOEntity {
+public abstract class AbstractNHttpEntity extends AbstractHttpEntity {
 
-    public StringNIOEntity(
-            final String s, 
-            String charset) throws UnsupportedEncodingException {
-        super(s, charset);
+    public final InputStream getContent() throws IOException, IllegalStateException {
+        throw new UnsupportedOperationException("Does not support blocking methods");
     }
 
-    public ReadableByteChannel getChannel() throws IOException {
-        return Channels.newChannel(getContent());
+    public final boolean isStreaming() {
+        return true;
+    }
+
+    public final void writeTo(OutputStream out) throws IOException {
+        throw new UnsupportedOperationException("Does not support blocking methods");
+    }
+
+    public final void consumeContent() throws IOException, UnsupportedOperationException {
+        throw new UnsupportedOperationException("Does not support blocking methods");
     }
 
 }

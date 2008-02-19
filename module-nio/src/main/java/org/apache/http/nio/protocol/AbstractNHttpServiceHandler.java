@@ -1,7 +1,7 @@
 /*
- * $HeadURL$
- * $Revision$
- * $Date$
+ * $HeadURL:$
+ * $Revision:$
+ * $Date:$
  *
  * ====================================================================
  * Licensed to the Apache Software Foundation (ASF) under one
@@ -31,36 +31,61 @@
 
 package org.apache.http.nio.protocol;
 
+import java.io.IOException;
+
 import org.apache.http.ConnectionReuseStrategy;
 import org.apache.http.HttpResponseFactory;
+import org.apache.http.nio.NHttpServerConnection;
+import org.apache.http.nio.NHttpServiceHandler;
 import org.apache.http.nio.util.ByteBufferAllocator;
+import org.apache.http.nio.util.HeapByteBufferAllocator;
 import org.apache.http.params.HttpParams;
+import org.apache.http.protocol.HttpExpectationVerifier;
 import org.apache.http.protocol.HttpProcessor;
-import org.apache.http.protocol.HttpRequestHandlerResolver;
 
-public abstract class NHttpServiceHandlerBase extends AbstractNHttpServiceHandler {
+public abstract class AbstractNHttpServiceHandler extends NHttpHandlerBase
+        implements NHttpServiceHandler {
 
-    protected HttpRequestHandlerResolver handlerResolver;
+    protected final HttpResponseFactory responseFactory;
 
-    public NHttpServiceHandlerBase(
+    protected HttpExpectationVerifier expectationVerifier;
+
+    public AbstractNHttpServiceHandler(
             final HttpProcessor httpProcessor,
             final HttpResponseFactory responseFactory,
             final ConnectionReuseStrategy connStrategy,
             final ByteBufferAllocator allocator,
             final HttpParams params) {
-        super(httpProcessor, responseFactory, connStrategy, allocator, params);
+        super(httpProcessor, connStrategy, allocator, params);
+        if (responseFactory == null) {
+            throw new IllegalArgumentException("Response factory may not be null");
+        }
+        this.responseFactory = responseFactory;
     }
 
-    public NHttpServiceHandlerBase(
+    public AbstractNHttpServiceHandler(
             final HttpProcessor httpProcessor,
             final HttpResponseFactory responseFactory,
             final ConnectionReuseStrategy connStrategy,
             final HttpParams params) {
-        super(httpProcessor, responseFactory, connStrategy, params);
+        this(httpProcessor, responseFactory, connStrategy,
+                new HeapByteBufferAllocator(), params);
     }
 
-    public void setHandlerResolver(final HttpRequestHandlerResolver handlerResolver) {
-        this.handlerResolver = handlerResolver;
+    public void setExpectationVerifier(final HttpExpectationVerifier expectationVerifier) {
+        this.expectationVerifier = expectationVerifier;
+    }
+
+    public void exception(final NHttpServerConnection conn, final IOException ex) {
+        shutdownConnection(conn, ex);
+
+        if (this.eventListener != null) {
+            this.eventListener.fatalIOException(ex, conn);
+        }
+    }
+
+    public void timeout(final NHttpServerConnection conn) {
+        handleTimeout(conn);
     }
 
 }

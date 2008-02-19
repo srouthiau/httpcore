@@ -1,7 +1,7 @@
 /*
- * $HeadURL$
- * $Revision$
- * $Date$
+ * $HeadURL:$
+ * $Revision:$
+ * $Date:$
  *
  * ====================================================================
  * Licensed to the Apache Software Foundation (ASF) under one
@@ -32,35 +32,49 @@
 package org.apache.http.nio.entity;
 
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
-import java.nio.channels.Channels;
-import java.nio.channels.ReadableByteChannel;
+import java.nio.ByteBuffer;
 
-import org.apache.http.HttpEntity;
-import org.apache.http.entity.StringEntity;
+import org.apache.http.nio.ContentEncoder;
+import org.apache.http.nio.IOControl;
+import org.apache.http.nio.protocol.AsyncNHttpServiceHandler;
 
 /**
- * An entity whose content is retrieved from a string. In addition to the 
- * standard {@link HttpEntity} interface this class also implements NIO specific 
- * {@link HttpNIOEntity}.
+ * An entity whose content is retrieved from a byte array.
+ * This entity is intended for use only as an {@link NHttpEntity}.
+ * Blocking methods are not supported.
  *
- * @author <a href="mailto:oleg at ural.ru">Oleg Kalnichevski</a>
+ * @author <a href="mailto:sberlin at gmail.com">Sam Berlin</a>
  *
- * @version $Revision$
- * 
+ * @version $Revision:$
+ *
+ * @see AsyncNHttpServiceHandler
  * @since 4.0
  */
-@Deprecated
-public class StringNIOEntity extends StringEntity implements HttpNIOEntity {
+public class NByteArrayEntity extends AbstractNHttpEntity implements ProducingNHttpEntity {
 
-    public StringNIOEntity(
-            final String s, 
-            String charset) throws UnsupportedEncodingException {
-        super(s, charset);
+    protected final ByteBuffer buffer;
+
+    public NByteArrayEntity(final byte[] b) {
+        this.buffer = ByteBuffer.wrap(b);
     }
 
-    public ReadableByteChannel getChannel() throws IOException {
-        return Channels.newChannel(getContent());
+    public void finish() {
+        buffer.rewind();
+    }
+
+    public void produceContent(ContentEncoder encoder, IOControl ioctrl)
+            throws IOException {
+        encoder.write(buffer);
+        if(!buffer.hasRemaining())
+            encoder.complete();
+    }
+
+    public long getContentLength() {
+        return buffer.limit();
+    }
+
+    public boolean isRepeatable() {
+        return true;
     }
 
 }
