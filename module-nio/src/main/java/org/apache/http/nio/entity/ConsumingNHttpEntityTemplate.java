@@ -1,7 +1,7 @@
 /*
- * $HeadURL:$
- * $Revision:$
- * $Date:$
+ * $HeadURL$
+ * $Revision$
+ * $Date$
  *
  * ====================================================================
  * Licensed to the Apache Software Foundation (ASF) under one
@@ -31,56 +31,53 @@
 
 package org.apache.http.nio.entity;
 
-import org.apache.http.HttpEntity;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 
-/**
- * A default implementation of {@link ConsumingNHttpEntity}.
- * Blocking output methods will throw {@link UnsupportedOperationException}.
- *
- * @author <a href="mailto:sberlin at gmail.com">Sam Berlin</a>
- */
-public class BasicConsumingNHttpEntity extends AbstractNHttpEntity implements ConsumingNHttpEntity {
+import org.apache.http.HttpEntity;
+import org.apache.http.entity.HttpEntityWrapper;
+import org.apache.http.nio.ContentDecoder;
+import org.apache.http.nio.IOControl;
+
+public class ConsumingNHttpEntityTemplate
+    extends HttpEntityWrapper implements ConsumingNHttpEntity {
 
     private final ContentListener contentListener;
-    private long contentLength;
-    private boolean handled;
 
-    public BasicConsumingNHttpEntity(ContentListener contentListener, HttpEntity httpEntity) {
+    public ConsumingNHttpEntityTemplate(final HttpEntity httpEntity, final ContentListener contentListener) {
+        super(httpEntity);
         this.contentListener = contentListener;
-        setChunked(httpEntity.isChunked());
-        setContentEncoding(httpEntity.getContentEncoding());
-        setContentLength(httpEntity.getContentLength());
-        setContentType(httpEntity.getContentType());
-    }
-
-    public void setHandled(boolean handled) {
-        this.handled = handled;
-    }
-
-    public boolean isHandled() {
-        return handled;
-    }
-
-    /**
-     * Specifies the length of the content.
-     *
-     * @param len       the number of bytes in the content, or
-     *                  a negative number to indicate an unknown length
-     */
-    public void setContentLength(long len) {
-        this.contentLength = len;
     }
 
     public ContentListener getContentListener() {
         return contentListener;
     }
 
-    public long getContentLength() {
-        return contentLength;
+    public InputStream getContent() throws IOException, IllegalStateException {
+        throw new UnsupportedOperationException("Does not support blocking methods");
     }
 
-    public boolean isRepeatable() {
-        return false;
+    public boolean isStreaming() {
+        return true;
+    }
+
+    public void writeTo(OutputStream out) throws IOException {
+        throw new UnsupportedOperationException("Does not support blocking methods");
+    }
+
+    public void consumeContent() throws IOException, UnsupportedOperationException {
+        throw new UnsupportedOperationException("Does not support blocking methods");
+    }
+
+    public void consumeContent(
+            final ContentDecoder decoder,
+            final IOControl ioctrl) throws IOException {
+        this.contentListener.contentAvailable(decoder, ioctrl);
+    }
+
+    public void finish() {
+        this.contentListener.finished();
     }
 
 }

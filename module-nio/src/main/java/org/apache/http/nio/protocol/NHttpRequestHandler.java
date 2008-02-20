@@ -1,7 +1,7 @@
 /*
- * $HeadURL:$
- * $Revision:$
- * $Date:$
+ * $HeadURL$
+ * $Revision$
+ * $Date$
  *
  * ====================================================================
  * Licensed to the Apache Software Foundation (ASF) under one
@@ -37,12 +37,12 @@ import org.apache.http.HttpEntityEnclosingRequest;
 import org.apache.http.HttpException;
 import org.apache.http.HttpRequest;
 import org.apache.http.HttpResponse;
-import org.apache.http.nio.entity.ContentListener;
+import org.apache.http.nio.entity.ConsumingNHttpEntity;
 import org.apache.http.protocol.HttpContext;
 
 public interface NHttpRequestHandler {
 
-    ContentListener entityRequest(HttpEntityEnclosingRequest request, HttpContext context)
+    ConsumingNHttpEntity entityRequest(HttpEntityEnclosingRequest request, HttpContext context)
         throws HttpException, IOException;
 
     void handle(HttpRequest request, HttpResponse response, HttpContext context)

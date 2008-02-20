@@ -1,7 +1,7 @@
 /*
- * $HeadURL:$
- * $Revision:$
- * $Date:$
+ * $HeadURL$
+ * $Revision$
+ * $Date$
  *
  * ====================================================================
  * Licensed to the Apache Software Foundation (ASF) under one
@@ -32,7 +32,6 @@
 package org.apache.http.nio.protocol;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
 
 import org.apache.http.ConnectionReuseStrategy;
 import org.apache.http.HttpEntity;
@@ -49,15 +48,15 @@ import org.apache.http.ProtocolVersion;
 import org.apache.http.UnsupportedHttpVersionException;
 import org.apache.http.nio.ContentDecoder;
 import org.apache.http.nio.ContentEncoder;
-import org.apache.http.nio.IOControl;
 import org.apache.http.nio.NHttpConnection;
 import org.apache.http.nio.NHttpServerConnection;
 import org.apache.http.nio.NHttpServiceHandler;
-import org.apache.http.nio.entity.BasicConsumingNHttpEntity;
 import org.apache.http.nio.entity.ConsumingNHttpEntity;
+import org.apache.http.nio.entity.ConsumingNHttpEntityTemplate;
 import org.apache.http.nio.entity.ContentListener;
 import org.apache.http.nio.entity.NByteArrayEntity;
 import org.apache.http.nio.entity.ProducingNHttpEntity;
+import org.apache.http.nio.entity.SkipContentListener;
 import org.apache.http.nio.util.ByteBufferAllocator;
 import org.apache.http.nio.util.HeapByteBufferAllocator;
 import org.apache.http.params.DefaultedHttpParams;
@@ -141,8 +140,13 @@ public class AsyncNHttpServiceHandler extends AbstractNHttpServiceHandler
     public void requestReceived(final NHttpServerConnection conn) {
         HttpContext context = conn.getContext();
 
+        ServerConnState connState = (ServerConnState) context.getAttribute(CONN_STATE);
+
         HttpRequest request = conn.getHttpRequest();
         request.setParams(new DefaultedHttpParams(request.getParams(), this.params));
+
+        NHttpRequestHandler requestHandler = getRequestHandler(request);
+        connState.setRequestHandler(requestHandler);
 
         ProtocolVersion ver = request.getRequestLine().getProtocolVersion();
         if (!ver.lessEquals(HttpVersion.HTTP_1_1)) {
@@ -186,7 +190,21 @@ public class AsyncNHttpServiceHandler extends AbstractNHttpServiceHandler
                     }
                 }
                 // Request content is expected.
-                // Wait until the request content is fully received
+                HttpEntity entity = ((HttpEntityEnclosingRequest) request).getEntity();
+
+                // Lookup request handler for this request
+                if (requestHandler != null) {
+                    ConsumingNHttpEntity consumingEntity = requestHandler.entityRequest(
+                            (HttpEntityEnclosingRequest) request, context);
+                    if (consumingEntity == null) {
+                        consumingEntity = new ConsumingNHttpEntityTemplate(
+                                entity,
+                                new SkipContentListener(this.allocator));
+                    }
+                    ((HttpEntityEnclosingRequest) request).setEntity(consumingEntity);
+                    connState.setConsumingEntity(consumingEntity);
+                }
+
             } else {
                 // No request content is expected.
                 // Process request right away
@@ -255,36 +273,18 @@ public class AsyncNHttpServiceHandler extends AbstractNHttpServiceHandler
 
     public void inputReady(final NHttpServerConnection conn, final ContentDecoder decoder) {
         HttpContext context = conn.getContext();
-        HttpEntityEnclosingRequest request = (HttpEntityEnclosingRequest) conn.getHttpRequest();
-        HttpEntity entity = request.getEntity();
+        HttpRequest request = conn.getHttpRequest();
+
         ServerConnState connState = (ServerConnState) context.getAttribute(CONN_STATE);
 
+        ConsumingNHttpEntity consumingEntity = connState.getConsumingEntity();
+
         try {
-            // If we haven't set the entity for asynchronous input yet...
-            if (!(entity instanceof ConsumingNHttpEntity)) {
-                NHttpRequestHandler handler = getRequestHandler(request);
-                ContentListener listener = null;
-                if (handler != null) {
-                    listener = handler.entityRequest(request, context);
-                }
-                if (listener == null) {
-                    listener = new SkipContentListener(allocator);
-                }
-                connState.setConsumingEntity(listener);
-                entity = new BasicConsumingNHttpEntity(listener, entity);
-                request.setEntity(entity);
-            }
 
-            BasicConsumingNHttpEntity consumingEntity = (BasicConsumingNHttpEntity) entity;
-            consumingEntity.getContentListener().consumeContent(decoder, conn);
-
+            consumingEntity.consumeContent(decoder, conn);
             if (decoder.isCompleted()) {
                 conn.suspendInput();
-
-                if (!consumingEntity.isHandled()) {
-                    consumingEntity.setHandled(true);
-                    processRequest(conn, request);
-                }
+                processRequest(conn, request);
             }
 
         } catch (IOException ex) {
@@ -449,7 +449,8 @@ public class AsyncNHttpServiceHandler extends AbstractNHttpServiceHandler
 
     static class ServerConnState {
 
-        private ContentListener consumingEntity;
+        private NHttpRequestHandler requestHandler;
+        private ConsumingNHttpEntity consumingEntity;
         private ProducingNHttpEntity producingEntity;
 
         void finishInput() {
@@ -471,35 +472,28 @@ public class AsyncNHttpServiceHandler extends AbstractNHttpServiceHandler
             finishOutput();
         }
 
+        public NHttpRequestHandler getRequestHandler() {
+            return this.requestHandler;
+        }
+
+        public void setRequestHandler(final NHttpRequestHandler requestHandler) {
+            this.requestHandler = requestHandler;
+        }
+
+        public ProducingNHttpEntity getProducingEntity() {
+            return this.producingEntity;
+        }
+
         public void setProducingEntity(final ProducingNHttpEntity producingEntity) {
             this.producingEntity = producingEntity;
         }
 
-        public void setConsumingEntity(final ContentListener consumingEntity) {
+        public ConsumingNHttpEntity getConsumingEntity() {
+            return this.consumingEntity;
+        }
+
+        public void setConsumingEntity(final ConsumingNHttpEntity consumingEntity) {
             this.consumingEntity = consumingEntity;
-        }
-
-    }
-
-    static class SkipContentListener implements ContentListener {
-        private final ByteBuffer buffer;
-        public SkipContentListener(ByteBufferAllocator allocator) {
-            this.buffer = allocator.allocate(2048);
-        }
-
-        public void consumeContent(ContentDecoder decoder, IOControl ioctrl)
-                throws IOException {
-            int totalRead = 0;
-            int lastRead;
-            do {
-                buffer.clear();
-                lastRead = decoder.read(buffer);
-                if (lastRead > 0)
-                    totalRead += lastRead;
-            } while (lastRead > 0);
-        }
-
-        public void finish() {
         }
 
     }

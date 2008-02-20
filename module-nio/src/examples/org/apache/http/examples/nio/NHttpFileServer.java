@@ -52,6 +52,8 @@ import org.apache.http.nio.ContentDecoderChannel;
 import org.apache.http.nio.FileContentDecoder;
 import org.apache.http.nio.IOControl;
 import org.apache.http.nio.NHttpConnection;
+import org.apache.http.nio.entity.ConsumingNHttpEntity;
+import org.apache.http.nio.entity.ConsumingNHttpEntityTemplate;
 import org.apache.http.nio.entity.ContentListener;
 import org.apache.http.nio.entity.NFileEntity;
 import org.apache.http.nio.entity.NStringEntity;
@@ -146,10 +148,12 @@ public class NHttpFileServer {
             this.useFileChannels = useFileChannels;
         }
 
-        public ContentListener entityRequest(
+        public ConsumingNHttpEntity entityRequest(
                 HttpEntityEnclosingRequest request, HttpContext context)
                 throws HttpException, IOException {
-            return new FileWriteListener(useFileChannels);
+            return new ConsumingNHttpEntityTemplate(
+                    request.getEntity(),
+                    new FileWriteListener(useFileChannels));
         }
 
         public void handle(
@@ -192,7 +196,7 @@ public class NHttpFileServer {
             this.useFileChannels = useFileChannels;
         }
 
-        public void consumeContent(ContentDecoder decoder, IOControl ioctrl)
+        public void contentAvailable(ContentDecoder decoder, IOControl ioctrl)
                 throws IOException {
             long transferred;
             if(useFileChannels && decoder instanceof FileContentDecoder) {
@@ -207,7 +211,7 @@ public class NHttpFileServer {
                 idx += transferred;
         }
 
-        public void finish() {
+        public void finished() {
             try {
                 inputFile.close();
             } catch(IOException ignored) {}

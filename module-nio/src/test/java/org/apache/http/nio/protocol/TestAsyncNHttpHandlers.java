@@ -1,7 +1,7 @@
 /*
- * $HeadURL:$
- * $Revision:$
- * $Date:$
+ * $HeadURL$
+ * $Revision$
+ * $Date$
  *
  * ====================================================================
  * Licensed to the Apache Software Foundation (ASF) under one
@@ -68,6 +68,7 @@ import org.apache.http.nio.NHttpClientHandler;
 import org.apache.http.nio.NHttpConnection;
 import org.apache.http.nio.NHttpServiceHandler;
 import org.apache.http.nio.entity.ConsumingNHttpEntity;
+import org.apache.http.nio.entity.ConsumingNHttpEntityTemplate;
 import org.apache.http.nio.entity.ContentListener;
 import org.apache.http.nio.entity.NByteArrayEntity;
 import org.apache.http.nio.entity.NStringEntity;
@@ -101,7 +102,7 @@ import org.apache.http.util.EntityUtils;
  * @author <a href="mailto:oleg at ural.ru">Oleg Kalnichevski</a>
  * @author <a href="mailto:sberlin at gmail.com">Sam Berlin</a>
  *
- * @version $Id:$
+ * @version $Id$
  */
 public class TestAsyncNHttpHandlers extends TestCase {
 
@@ -241,9 +242,9 @@ public class TestAsyncNHttpHandlers extends TestCase {
 
         NHttpRequestHandler requestHandler = new NHttpRequestHandler() {
 
-            public ContentListener entityRequest(
+            public ConsumingNHttpEntity entityRequest(
                     HttpEntityEnclosingRequest request, HttpContext context) {
-                throw new UnsupportedOperationException();
+                return null;
             }
 
             public void handle(
@@ -374,17 +375,19 @@ public class TestAsyncNHttpHandlers extends TestCase {
 
         NHttpRequestHandler requestHandler = new NHttpRequestHandler() {
 
-            public ContentListener entityRequest(
+            public ConsumingNHttpEntity entityRequest(
                     HttpEntityEnclosingRequest request, HttpContext context)
                     throws HttpException, IOException {
-                return new ByteContentListener();
+                return new ConsumingNHttpEntityTemplate(
+                        request.getEntity(),
+                        new ByteContentListener());
             }
 
             public void handle(
                     HttpRequest request, HttpResponse response, HttpContext context)
                     throws HttpException, IOException {
                 if (request instanceof HttpEntityEnclosingRequest) {
-                    ConsumingNHttpEntity incoming = (ConsumingNHttpEntity)((HttpEntityEnclosingRequest) request).getEntity();
+                    ConsumingNHttpEntityTemplate incoming = (ConsumingNHttpEntityTemplate)((HttpEntityEnclosingRequest) request).getEntity();
                     byte[] b = ((ByteContentListener)incoming.getContentListener()).getContent();
                     response.setEntity(new NByteArrayEntity(b));
                 } else {
@@ -509,17 +512,19 @@ public class TestAsyncNHttpHandlers extends TestCase {
 
         NHttpRequestHandler requestHandler = new NHttpRequestHandler() {
 
-            public ContentListener entityRequest(
+            public ConsumingNHttpEntity entityRequest(
                     HttpEntityEnclosingRequest request, HttpContext context)
                     throws HttpException, IOException {
-                return new ByteContentListener();
+                return new ConsumingNHttpEntityTemplate(
+                        request.getEntity(),
+                        new ByteContentListener());
             }
 
             public void handle(
                     HttpRequest request, HttpResponse response, HttpContext context)
                     throws HttpException, IOException {
                 if (request instanceof HttpEntityEnclosingRequest) {
-                    ConsumingNHttpEntity incoming = (ConsumingNHttpEntity)((HttpEntityEnclosingRequest) request).getEntity();
+                    ConsumingNHttpEntityTemplate incoming = (ConsumingNHttpEntityTemplate)((HttpEntityEnclosingRequest) request).getEntity();
                     byte[] b = ((ByteContentListener)incoming.getContentListener()).getContent();
                     NByteArrayEntity outgoing = new NByteArrayEntity(b);
                     outgoing.setChunked(true);
@@ -649,17 +654,19 @@ public class TestAsyncNHttpHandlers extends TestCase {
 
         NHttpRequestHandler requestHandler = new NHttpRequestHandler() {
 
-            public ContentListener entityRequest(
+            public ConsumingNHttpEntity entityRequest(
                     HttpEntityEnclosingRequest request, HttpContext context)
                     throws HttpException, IOException {
-                return new ByteContentListener();
+                return new ConsumingNHttpEntityTemplate(
+                        request.getEntity(),
+                        new ByteContentListener());
             }
 
             public void handle(
                     HttpRequest request, HttpResponse response, HttpContext context)
                     throws HttpException, IOException {
                 if (request instanceof HttpEntityEnclosingRequest) {
-                    ConsumingNHttpEntity incoming = (ConsumingNHttpEntity)((HttpEntityEnclosingRequest) request).getEntity();
+                    ConsumingNHttpEntityTemplate incoming = (ConsumingNHttpEntityTemplate)((HttpEntityEnclosingRequest) request).getEntity();
                     byte[] b = ((ByteContentListener)incoming.getContentListener()).getContent();
                     NByteArrayEntity outgoing = new NByteArrayEntity(b);
                     outgoing.setChunked(false);
@@ -789,17 +796,19 @@ public class TestAsyncNHttpHandlers extends TestCase {
 
         NHttpRequestHandler requestHandler = new NHttpRequestHandler() {
 
-            public ContentListener entityRequest(
+            public ConsumingNHttpEntity entityRequest(
                     HttpEntityEnclosingRequest request, HttpContext context)
                     throws HttpException, IOException {
-                return new ByteContentListener();
+                return new ConsumingNHttpEntityTemplate(
+                        request.getEntity(),
+                        new ByteContentListener());
             }
 
             public void handle(
                     HttpRequest request, HttpResponse response, HttpContext context)
                     throws HttpException, IOException {
                 if (request instanceof HttpEntityEnclosingRequest) {
-                    ConsumingNHttpEntity incoming = (ConsumingNHttpEntity)((HttpEntityEnclosingRequest) request).getEntity();
+                    ConsumingNHttpEntityTemplate incoming = (ConsumingNHttpEntityTemplate)((HttpEntityEnclosingRequest) request).getEntity();
                     byte[] b = ((ByteContentListener)incoming.getContentListener()).getContent();
                     NByteArrayEntity outgoing = new NByteArrayEntity(b);
                     outgoing.setChunked(true);
@@ -922,10 +931,12 @@ public class TestAsyncNHttpHandlers extends TestCase {
 
         NHttpRequestHandler requestHandler = new NHttpRequestHandler() {
 
-            public ContentListener entityRequest(
+            public ConsumingNHttpEntity entityRequest(
                     HttpEntityEnclosingRequest request, HttpContext context)
                     throws HttpException, IOException {
-                return new ByteContentListener();
+                return new ConsumingNHttpEntityTemplate(
+                        request.getEntity(),
+                        new ByteContentListener());
             }
 
             public void handle(
@@ -1078,9 +1089,12 @@ public class TestAsyncNHttpHandlers extends TestCase {
 
         NHttpRequestHandler requestHandler = new NHttpRequestHandler() {
 
-            public ContentListener entityRequest(
-                    HttpEntityEnclosingRequest request, HttpContext context) {
-                throw new UnsupportedOperationException();
+            public ConsumingNHttpEntity entityRequest(
+                    HttpEntityEnclosingRequest request, HttpContext context)
+                    throws HttpException, IOException {
+                return new ConsumingNHttpEntityTemplate(
+                        request.getEntity(),
+                        new ByteContentListener());
             }
 
             public void handle(
@@ -1208,12 +1222,12 @@ public class TestAsyncNHttpHandlers extends TestCase {
     static class ByteContentListener implements ContentListener {
         final SimpleInputBuffer input = new SimpleInputBuffer(2048, new HeapByteBufferAllocator());
 
-        public void consumeContent(ContentDecoder decoder, IOControl ioctrl)
+        public void contentAvailable(ContentDecoder decoder, IOControl ioctrl)
                 throws IOException {
             input.consumeContent(decoder);
         }
 
-        public void finish() {
+        public void finished() {
             input.reset();
         }
 

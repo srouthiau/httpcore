@@ -32,26 +32,38 @@
 package org.apache.http.nio.entity;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 
-import org.apache.http.HttpEntity;
 import org.apache.http.nio.ContentDecoder;
 import org.apache.http.nio.IOControl;
+import org.apache.http.nio.util.ByteBufferAllocator;
 
-/**
- * A non-blocking entity that allows content to be consumed from a decoder.
- *
- * @author <a href="mailto:sberlin at gmail.com">Sam Berlin</a>
- */
-public interface ConsumingNHttpEntity extends HttpEntity {
+public class SkipContentListener implements ContentListener {
 
-    /**
-     * Notification that content is available to be read from the decoder.
-     */
-    void consumeContent(ContentDecoder decoder, IOControl ioctrl) throws IOException;
+    private final ByteBuffer buffer;
 
-    /**
-     * Notification that any resources allocated for reading can be released.
-     */
-    void finish();
+    public SkipContentListener(final ByteBufferAllocator allocator) {
+        super();
+        if (allocator == null) {
+            throw new IllegalArgumentException("ByteBuffer allocator may not be null");
+        }
+        this.buffer = allocator.allocate(2048);
+    }
+
+    public void contentAvailable(
+            final ContentDecoder decoder,
+            final IOControl ioctrl) throws IOException {
+        int totalRead = 0;
+        int lastRead;
+        do {
+            buffer.clear();
+            lastRead = decoder.read(buffer);
+            if (lastRead > 0)
+                totalRead += lastRead;
+        } while (lastRead > 0);
+    }
+
+    public void finished() {
+    }
 
 }
