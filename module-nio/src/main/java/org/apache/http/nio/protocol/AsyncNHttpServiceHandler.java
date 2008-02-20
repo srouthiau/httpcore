@@ -48,7 +48,6 @@ import org.apache.http.ProtocolVersion;
 import org.apache.http.UnsupportedHttpVersionException;
 import org.apache.http.nio.ContentDecoder;
 import org.apache.http.nio.ContentEncoder;
-import org.apache.http.nio.NHttpConnection;
 import org.apache.http.nio.NHttpServerConnection;
 import org.apache.http.nio.NHttpServiceHandler;
 import org.apache.http.nio.entity.ConsumingNHttpEntity;
@@ -141,6 +140,7 @@ public class AsyncNHttpServiceHandler extends AbstractNHttpServiceHandler
         HttpContext context = conn.getContext();
 
         ServerConnState connState = (ServerConnState) context.getAttribute(CONN_STATE);
+        connState.reset();
 
         HttpRequest request = conn.getHttpRequest();
         request.setParams(new DefaultedHttpParams(request.getParams(), this.params));
@@ -230,7 +230,7 @@ public class AsyncNHttpServiceHandler extends AbstractNHttpServiceHandler
         HttpContext context = conn.getContext();
 
         ServerConnState connState = (ServerConnState) context.getAttribute(CONN_STATE);
-        connState.finish();
+        connState.reset();
 
         if (this.eventListener != null) {
             this.eventListener.connectionClosed(conn);
@@ -329,24 +329,6 @@ public class AsyncNHttpServiceHandler extends AbstractNHttpServiceHandler
                 this.eventListener.fatalIOException(ex, conn);
             }
         }
-    }
-
-    @Override
-    protected void closeConnection(final NHttpConnection conn, final Throwable cause) {
-        HttpContext context = conn.getContext();
-        ServerConnState connState = (ServerConnState) context.getAttribute(CONN_STATE);
-        connState.finish();
-
-        super.closeConnection(conn, cause);
-    }
-
-    @Override
-    protected void shutdownConnection(NHttpConnection conn, Throwable cause) {
-        HttpContext context = conn.getContext();
-        ServerConnState connState = (ServerConnState) context.getAttribute(CONN_STATE);
-        connState.finish();
-
-        super.shutdownConnection(conn, cause);
     }
 
     private void handleException(final HttpException ex, final HttpResponse response) {
@@ -467,9 +449,10 @@ public class AsyncNHttpServiceHandler extends AbstractNHttpServiceHandler
             }
         }
 
-        void finish() {
+        void reset() {
             finishInput();
             finishOutput();
+            this.requestHandler = null;
         }
 
         public NHttpRequestHandler getRequestHandler() {
