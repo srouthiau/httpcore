@@ -1,7 +1,7 @@
 /*
- * $HeadURL:$
- * $Revision:$
- * $Date:$
+ * $HeadURL$
+ * $Revision$
+ * $Date$
  *
  * ====================================================================
  * Licensed to the Apache Software Foundation (ASF) under one
@@ -31,10 +31,14 @@
 
 package org.apache.http.nio.entity;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
 
+import org.apache.http.entity.AbstractHttpEntity;
 import org.apache.http.nio.ContentEncoder;
 import org.apache.http.nio.IOControl;
 import org.apache.http.nio.protocol.AsyncNHttpServiceHandler;
@@ -47,14 +51,15 @@ import org.apache.http.protocol.HTTP;
  *
  * @author <a href="mailto:sberlin at gmail.com">Sam Berlin</a>
  *
- * @version $Revision:$
+ * @version $Revision$
  *
  * @see AsyncNHttpServiceHandler
  * @since 4.0
  *
  */
-public class NStringEntity extends AbstractNHttpEntity implements ProducingNHttpEntity {
+public class NStringEntity extends AbstractHttpEntity implements ProducingNHttpEntity {
 
+    protected final byte[] content;
     protected final ByteBuffer buffer;
 
     public NStringEntity(final String s, String charset)
@@ -65,7 +70,8 @@ public class NStringEntity extends AbstractNHttpEntity implements ProducingNHttp
         if (charset == null) {
             charset = HTTP.DEFAULT_CONTENT_CHARSET;
         }
-        this.buffer = ByteBuffer.wrap(s.getBytes(charset));
+        this.content = s.getBytes(charset);
+        this.buffer = ByteBuffer.wrap(this.content);
         setContentType(HTTP.PLAIN_TEXT_TYPE + HTTP.CHARSET_PARAM + charset);
     }
 
@@ -90,6 +96,22 @@ public class NStringEntity extends AbstractNHttpEntity implements ProducingNHttp
         encoder.write(buffer);
         if(!buffer.hasRemaining())
             encoder.complete();
+    }
+
+    public boolean isStreaming() {
+        return false;
+    }
+
+    public InputStream getContent() {
+        return new ByteArrayInputStream(content);
+    }
+
+    public void writeTo(final OutputStream outstream) throws IOException {
+        if (outstream == null) {
+            throw new IllegalArgumentException("Output stream may not be null");
+        }
+        outstream.write(content);
+        outstream.flush();
     }
 
 }

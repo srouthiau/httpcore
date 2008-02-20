@@ -1,7 +1,7 @@
 /*
- * $HeadURL:$
- * $Revision:$
- * $Date:$
+ * $HeadURL$
+ * $Revision$
+ * $Date$
  *
  * ====================================================================
  * Licensed to the Apache Software Foundation (ASF) under one
@@ -34,8 +34,11 @@ package org.apache.http.nio.entity;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.channels.FileChannel;
 
+import org.apache.http.entity.AbstractHttpEntity;
 import org.apache.http.nio.ContentEncoder;
 import org.apache.http.nio.ContentEncoderChannel;
 import org.apache.http.nio.FileContentEncoder;
@@ -48,11 +51,11 @@ import org.apache.http.nio.IOControl;
  *
  * @author <a href="mailto:sberlin at gmail.com">Sam Berlin</a>
  *
- * @version $Revision:$
+ * @version $Revision$
  *
  * @since 4.0
  */
-public class NFileEntity extends AbstractNHttpEntity implements ProducingNHttpEntity {
+public class NFileEntity extends AbstractHttpEntity implements ProducingNHttpEntity {
 
     private final File file;
     private FileChannel fileChannel;
@@ -104,6 +107,31 @@ public class NFileEntity extends AbstractNHttpEntity implements ProducingNHttpEn
 
         if(idx >= fileChannel.size())
             encoder.complete();
+    }
+
+    public boolean isStreaming() {
+        return false;
+    }
+
+    public InputStream getContent() throws IOException {
+        return new FileInputStream(this.file);
+    }
+
+    public void writeTo(final OutputStream outstream) throws IOException {
+        if (outstream == null) {
+            throw new IllegalArgumentException("Output stream may not be null");
+        }
+        InputStream instream = new FileInputStream(this.file);
+        try {
+            byte[] tmp = new byte[4096];
+            int l;
+            while ((l = instream.read(tmp)) != -1) {
+                outstream.write(tmp, 0, l);
+            }
+            outstream.flush();
+        } finally {
+            instream.close();
+        }
     }
 
 }

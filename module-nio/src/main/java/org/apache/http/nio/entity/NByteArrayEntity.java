@@ -1,7 +1,7 @@
 /*
- * $HeadURL:$
- * $Revision:$
- * $Date:$
+ * $HeadURL$
+ * $Revision$
+ * $Date$
  *
  * ====================================================================
  * Licensed to the Apache Software Foundation (ASF) under one
@@ -31,9 +31,13 @@
 
 package org.apache.http.nio.entity;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.ByteBuffer;
 
+import org.apache.http.entity.AbstractHttpEntity;
 import org.apache.http.nio.ContentEncoder;
 import org.apache.http.nio.IOControl;
 import org.apache.http.nio.protocol.AsyncNHttpServiceHandler;
@@ -45,16 +49,19 @@ import org.apache.http.nio.protocol.AsyncNHttpServiceHandler;
  *
  * @author <a href="mailto:sberlin at gmail.com">Sam Berlin</a>
  *
- * @version $Revision:$
+ * @version $Revision$
  *
  * @see AsyncNHttpServiceHandler
  * @since 4.0
  */
-public class NByteArrayEntity extends AbstractNHttpEntity implements ProducingNHttpEntity {
+public class NByteArrayEntity
+    extends AbstractHttpEntity implements ProducingNHttpEntity {
 
+    protected final byte[] content;
     protected final ByteBuffer buffer;
 
     public NByteArrayEntity(final byte[] b) {
+        this.content = b;
         this.buffer = ByteBuffer.wrap(b);
     }
 
@@ -75,6 +82,22 @@ public class NByteArrayEntity extends AbstractNHttpEntity implements ProducingNH
 
     public boolean isRepeatable() {
         return true;
+    }
+
+    public boolean isStreaming() {
+        return false;
+    }
+
+    public InputStream getContent() {
+        return new ByteArrayInputStream(content);
+    }
+
+    public void writeTo(final OutputStream outstream) throws IOException {
+        if (outstream == null) {
+            throw new IllegalArgumentException("Output stream may not be null");
+        }
+        outstream.write(content);
+        outstream.flush();
     }
 
 }
