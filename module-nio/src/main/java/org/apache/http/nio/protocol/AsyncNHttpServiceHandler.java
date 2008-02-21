@@ -105,16 +105,20 @@ public class AsyncNHttpServiceHandler extends AbstractNHttpServiceHandler
 
     protected NHttpRequestHandlerResolver handlerResolver;
 
-    public AsyncNHttpServiceHandler(final HttpProcessor httpProcessor,
+    public AsyncNHttpServiceHandler(
+            final HttpProcessor httpProcessor,
             final HttpResponseFactory responseFactory,
             final ConnectionReuseStrategy connStrategy,
-            final ByteBufferAllocator allocator, final HttpParams params) {
+            final ByteBufferAllocator allocator,
+            final HttpParams params) {
         super(httpProcessor, responseFactory, connStrategy, allocator, params);
     }
 
-    public AsyncNHttpServiceHandler(final HttpProcessor httpProcessor,
+    public AsyncNHttpServiceHandler(
+            final HttpProcessor httpProcessor,
             final HttpResponseFactory responseFactory,
-            final ConnectionReuseStrategy connStrategy, final HttpParams params) {
+            final ConnectionReuseStrategy connStrategy,
+            final HttpParams params) {
         this(httpProcessor, responseFactory, connStrategy,
                 new HeapByteBufferAllocator(), params);
     }
@@ -122,7 +126,6 @@ public class AsyncNHttpServiceHandler extends AbstractNHttpServiceHandler
     public void setHandlerResolver(final NHttpRequestHandlerResolver handlerResolver) {
         this.handlerResolver = handlerResolver;
     }
-
 
     public void connected(final NHttpServerConnection conn) {
         HttpContext context = conn.getContext();
@@ -169,7 +172,6 @@ public class AsyncNHttpServiceHandler extends AbstractNHttpServiceHandler
                         try {
                             this.expectationVerifier.verify(request, response, context);
                         } catch (HttpException ex) {
-                            ex.printStackTrace();
                             response = this.responseFactory.newHttpResponse(
                                     HttpVersion.HTTP_1_0,
                                     HttpStatus.SC_INTERNAL_SERVER_ERROR,
