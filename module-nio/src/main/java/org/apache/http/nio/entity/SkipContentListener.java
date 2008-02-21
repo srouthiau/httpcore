@@ -38,6 +38,9 @@ import org.apache.http.nio.ContentDecoder;
 import org.apache.http.nio.IOControl;
 import org.apache.http.nio.util.ByteBufferAllocator;
 
+/**
+ * A simple {@link ContentListener} that reads and ignores all content.
+ */
 public class SkipContentListener implements ContentListener {
 
     private final ByteBuffer buffer;

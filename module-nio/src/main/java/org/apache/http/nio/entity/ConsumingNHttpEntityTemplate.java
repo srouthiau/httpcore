@@ -40,6 +40,10 @@ import org.apache.http.entity.HttpEntityWrapper;
 import org.apache.http.nio.ContentDecoder;
 import org.apache.http.nio.IOControl;
 
+/**
+ * A {@link ConsumingNHttpEntity} that forwards available content to a
+ * {@link ContentListener}.
+ */
 public class ConsumingNHttpEntityTemplate
     extends HttpEntityWrapper implements ConsumingNHttpEntity {
 

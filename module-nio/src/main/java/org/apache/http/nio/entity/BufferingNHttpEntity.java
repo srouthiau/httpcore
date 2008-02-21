@@ -42,8 +42,14 @@ import org.apache.http.nio.IOControl;
 import org.apache.http.nio.util.ByteBufferAllocator;
 import org.apache.http.nio.util.SimpleInputBuffer;
 
-public class BufferingNHttpEntity
-    extends HttpEntityWrapper implements ConsumingNHttpEntity {
+/**
+ * A {@link ConsumingNHttpEntity} that consumes content into a buffer. The
+ * content can be retrieved as an InputStream via
+ * {@link HttpEntity#getContent()}, or written to an output stream via
+ * {@link HttpEntity#writeTo(OutputStream)}.
+ */
+public class BufferingNHttpEntity extends HttpEntityWrapper implements
+        ConsumingNHttpEntity {
 
     private final static int BUFFER_SIZE = 2048;
 

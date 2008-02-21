@@ -1,7 +1,7 @@
 /*
- * $HeadURL:$
- * $Revision:$
- * $Date:$
+ * $HeadURL$
+ * $Revision$
+ * $Date$
  *
  * ====================================================================
  * Licensed to the Apache Software Foundation (ASF) under one
@@ -51,6 +51,9 @@ public interface ProducingNHttpEntity extends HttpEntity {
      */
     void produceContent(ContentEncoder encoder, IOControl ioctrl) throws IOException;
 
+    /**
+     * Notification that any resources allocated for writing can be released.
+     */
     void finish();
 
 }

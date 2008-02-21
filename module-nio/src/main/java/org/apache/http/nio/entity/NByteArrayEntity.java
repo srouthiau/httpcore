@@ -44,8 +44,6 @@ import org.apache.http.nio.protocol.AsyncNHttpServiceHandler;
 
 /**
  * An entity whose content is retrieved from a byte array.
- * This entity is intended for use only as an {@link NHttpEntity}.
- * Blocking methods are not supported.
  *
  * @author <a href="mailto:sberlin at gmail.com">Sam Berlin</a>
  *

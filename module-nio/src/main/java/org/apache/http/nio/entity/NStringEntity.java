@@ -46,8 +46,6 @@ import org.apache.http.protocol.HTTP;
 
 /**
  * An entity whose content is retrieved from a string.
- * This entity is intended for use only as an {@link NHttpEntity}.
- * Blocking methods are not supported.
  *
  * @author <a href="mailto:sberlin at gmail.com">Sam Berlin</a>
  *

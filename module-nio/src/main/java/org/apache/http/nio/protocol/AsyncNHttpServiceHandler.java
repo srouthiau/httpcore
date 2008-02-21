@@ -52,7 +52,6 @@ import org.apache.http.nio.NHttpServerConnection;
 import org.apache.http.nio.NHttpServiceHandler;
 import org.apache.http.nio.entity.ConsumingNHttpEntity;
 import org.apache.http.nio.entity.ConsumingNHttpEntityTemplate;
-import org.apache.http.nio.entity.ContentListener;
 import org.apache.http.nio.entity.NByteArrayEntity;
 import org.apache.http.nio.entity.ProducingNHttpEntity;
 import org.apache.http.nio.entity.SkipContentListener;
@@ -63,38 +62,29 @@ import org.apache.http.params.HttpParams;
 import org.apache.http.protocol.ExecutionContext;
 import org.apache.http.protocol.HttpContext;
 import org.apache.http.protocol.HttpProcessor;
-import org.apache.http.protocol.HttpRequestHandler;
 import org.apache.http.util.EncodingUtils;
 
 /**
  * HTTP service handler implementation that works with
  * {@link ConsumingNHttpEntity} and {@link ProducingNHttpEntity}. The contents
  * of HTTP headers are stored in memory, HTTP entities are streamed directly
- * from the NHttpEntity to the underlying channel (and vice versa).
+ * from the entities to the underlying channel (and vice versa).
  * <p>
- * When using this {@link NHttpServiceHandler}, it is important to ensure that
- * entities supplied for writing implement ProducingNHttpEntity. Doing
- * so will allow the entity to be written out asynchronously. If entities
- * supplied for writing do not implement ProducingNHttpEntity, a delegate is
- * added that buffers the entire contents in memory. Additionally, the buffering
- * might take place in the I/O thread, which could cause I/O to block
- * temporarily. For best results, ensure that all entities set on
- * {@link HttpResponse HttpResponses} from
- * {@link HttpRequestHandler HttpRequestHandlers} implement
+ * When using this, it is important to ensure that entities supplied for writing
+ * implement ProducingNHttpEntity. Doing so will allow the entity to be written
+ * out asynchronously. If entities supplied for writing do not implement
+ * ProducingNHttpEntity, a delegate is added that buffers the entire contents in
+ * memory. Additionally, the buffering might take place in the I/O thread, which
+ * could cause I/O to block temporarily. For best results, ensure that all
+ * entities set on {@link HttpResponse HttpResponses} from
+ * {@link NHttpRequestHandler NHttpRequestHandlers} implement
  * ProducingNHttpEntity.
  * <p>
- * If incoming requests have entities, HttpRequestHandlers <b>must not</b> call
- * {@link HttpEntity#getContent()}. Doing so will throw an
- * {@link UnsupportedOperationException}. Instead, handlers must expect that
- * incoming entities implement ConsumingNHttpEntity and install a
- * {@link ContentListener} on those entities. The ContentListener will be
- * notified when new data is available for reading. After all data has been
- * read, the response will automatically be sent.
- * <p>
- * To support legacy HttpRequestHandlers that do use getContent(), you can wrap
- * the handler within a {@link NBlockingHttpRequestHandler}. Doing so will
- * allow the handler to be processed on a new thread, in a blocking manner.
- * <p>
+ * If incoming requests are entity requests, NHttpRequestHandlers are expected
+ * to return a ConsumingNHttpEntity for reading the content. After the entity is
+ * finished reading the data,
+ * {@link NHttpRequestHandler#handle(HttpRequest, HttpResponse, NHttpResponseTrigger, HttpContext)} is
+ * called to generate a response.
  *
  * @author <a href="mailto:oleg at ural.ru">Oleg Kalnichevski</a>
  * @author <a href="mailto:sberlin at gmail.com">Sam Berlin</a>
@@ -431,27 +421,27 @@ public class AsyncNHttpServiceHandler extends AbstractNHttpServiceHandler
          return handler;
     }
 
-    static class ServerConnState {
+    protected static class ServerConnState {
 
         private NHttpRequestHandler requestHandler;
         private ConsumingNHttpEntity consumingEntity;
         private ProducingNHttpEntity producingEntity;
 
-        void finishInput() {
+        public void finishInput() {
             if (this.consumingEntity != null) {
                 this.consumingEntity.finish();
                 this.consumingEntity = null;
             }
         }
 
-        void finishOutput() {
+        public void finishOutput() {
             if (this.producingEntity != null) {
                 this.producingEntity.finish();
                 this.producingEntity = null;
             }
         }
 
-        void reset() {
+        public void reset() {
             finishInput();
             finishOutput();
             this.requestHandler = null;
