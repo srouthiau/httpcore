@@ -133,7 +133,6 @@ public class AsyncNHttpServiceHandler extends AbstractNHttpServiceHandler
         HttpContext context = conn.getContext();
 
         ServerConnState connState = (ServerConnState) context.getAttribute(CONN_STATE);
-        connState.reset();
 
         HttpRequest request = conn.getHttpRequest();
         request.setParams(new DefaultedHttpParams(request.getParams(), this.params));
@@ -293,10 +292,6 @@ public class AsyncNHttpServiceHandler extends AbstractNHttpServiceHandler
     }
 
     public void responseReady(final NHttpServerConnection conn) {
-        if (conn.isOpen()) {
-            // Make sure there is no input stuck in the session buffer
-            conn.requestInput();
-        }
     }
 
     public void outputReady(final NHttpServerConnection conn, final ContentEncoder encoder) {
@@ -312,6 +307,10 @@ public class AsyncNHttpServiceHandler extends AbstractNHttpServiceHandler
                 connState.finishOutput();
                 if (!this.connStrategy.keepAlive(response, context)) {
                     conn.close();
+                } else {
+                    // Ready to process new request
+                    connState.reset();
+                    conn.requestInput();
                 }
             }
 
@@ -405,6 +404,10 @@ public class AsyncNHttpServiceHandler extends AbstractNHttpServiceHandler
         } else {
             if (!this.connStrategy.keepAlive(response, context)) {
                 conn.close();
+            } else {
+                // Ready to process new request
+                connState.reset();
+                conn.requestInput();
             }
         }
 
