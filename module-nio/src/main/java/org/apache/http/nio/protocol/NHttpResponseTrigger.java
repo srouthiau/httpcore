@@ -33,21 +33,26 @@ package org.apache.http.nio.protocol;
 
 import java.io.IOException;
 
-import org.apache.http.HttpEntityEnclosingRequest;
 import org.apache.http.HttpException;
-import org.apache.http.HttpRequest;
 import org.apache.http.HttpResponse;
-import org.apache.http.nio.entity.ConsumingNHttpEntity;
-import org.apache.http.protocol.HttpContext;
 
-public interface NHttpRequestHandler {
+public interface NHttpResponseTrigger {
 
-    ConsumingNHttpEntity entityRequest(HttpEntityEnclosingRequest request,
-            HttpContext context)
-        throws HttpException, IOException;
+    /**
+     * Submits a response for sending.
+     */
+    void submitResponse(HttpResponse response);
 
-    void handle(HttpRequest request, HttpResponse response,
-            NHttpResponseTrigger trigger, HttpContext context)
-        throws HttpException, IOException;
+    /**
+     * Submits a protocol exception that was generated while
+     * processing a request.
+     */
+    void handleException(HttpException ex);
+
+    /**
+     * Submits an IOException that was generated while
+     * processing a request.
+     */
+    void handleException(IOException ex);
 
 }

@@ -48,6 +48,7 @@ import org.apache.http.ProtocolVersion;
 import org.apache.http.UnsupportedHttpVersionException;
 import org.apache.http.nio.ContentDecoder;
 import org.apache.http.nio.ContentEncoder;
+import org.apache.http.nio.IOControl;
 import org.apache.http.nio.NHttpServerConnection;
 import org.apache.http.nio.NHttpServiceHandler;
 import org.apache.http.nio.entity.ConsumingNHttpEntity;
@@ -83,8 +84,8 @@ import org.apache.http.util.EncodingUtils;
  * If incoming requests are entity requests, NHttpRequestHandlers are expected
  * to return a ConsumingNHttpEntity for reading the content. After the entity is
  * finished reading the data,
- * {@link NHttpRequestHandler#handle(HttpRequest, HttpResponse, NHttpResponseTrigger, HttpContext)} is
- * called to generate a response.
+ * {@link NHttpRequestHandler#handle(HttpRequest, HttpResponse, NHttpResponseTrigger, HttpContext)}
+ * is called to generate a response.
  *
  * @author <a href="mailto:oleg at ural.ru">Oleg Kalnichevski</a>
  * @author <a href="mailto:sberlin at gmail.com">Sam Berlin</a>
@@ -136,6 +137,8 @@ public class AsyncNHttpServiceHandler extends AbstractNHttpServiceHandler
 
         HttpRequest request = conn.getHttpRequest();
         request.setParams(new DefaultedHttpParams(request.getParams(), this.params));
+
+        connState.setRequest(request);
 
         NHttpRequestHandler requestHandler = getRequestHandler(request);
         connState.setRequestHandler(requestHandler);
@@ -264,10 +267,9 @@ public class AsyncNHttpServiceHandler extends AbstractNHttpServiceHandler
 
     public void inputReady(final NHttpServerConnection conn, final ContentDecoder decoder) {
         HttpContext context = conn.getContext();
-        HttpRequest request = conn.getHttpRequest();
-
         ServerConnState connState = (ServerConnState) context.getAttribute(CONN_STATE);
 
+        HttpRequest request = connState.getRequest();
         ConsumingNHttpEntity consumingEntity = connState.getConsumingEntity();
 
         try {
@@ -292,12 +294,57 @@ public class AsyncNHttpServiceHandler extends AbstractNHttpServiceHandler
     }
 
     public void responseReady(final NHttpServerConnection conn) {
+        HttpContext context = conn.getContext();
+        ServerConnState connState = (ServerConnState) context.getAttribute(CONN_STATE);
+
+        if (connState.isHandled()) {
+            return;
+        }
+
+        HttpRequest request = connState.getRequest();
+        HttpResponse response = null;
+
+        try {
+
+            IOException ioex = connState.getIOExepction();
+            if (ioex != null) {
+                throw ioex;
+            }
+
+            HttpException httpex = connState.getHttpExepction();
+            if (httpex != null) {
+                response = this.responseFactory.newHttpResponse(HttpVersion.HTTP_1_0,
+                        HttpStatus.SC_INTERNAL_SERVER_ERROR, context);
+                response.setParams(
+                        new DefaultedHttpParams(response.getParams(), this.params));
+                handleException(httpex, response);
+                connState.setResponse(response);
+            }
+
+            response = connState.getResponse();
+            if (response != null) {
+                connState.setHandled(true);
+                sendResponse(conn, request, response);
+            }
+
+        } catch (IOException ex) {
+            shutdownConnection(conn, ex);
+            if (this.eventListener != null) {
+                this.eventListener.fatalIOException(ex, conn);
+            }
+        } catch (HttpException ex) {
+            closeConnection(conn, ex);
+            if (this.eventListener != null) {
+                this.eventListener.fatalProtocolException(ex, conn);
+            }
+        }
     }
 
     public void outputReady(final NHttpServerConnection conn, final ContentEncoder encoder) {
         HttpContext context = conn.getContext();
-        HttpResponse response = conn.getHttpResponse();
         ServerConnState connState = (ServerConnState) context.getAttribute(CONN_STATE);
+
+        HttpResponse response = conn.getHttpResponse();
 
         try {
             ProducingNHttpEntity entity = (ProducingNHttpEntity) response.getEntity();
@@ -344,6 +391,8 @@ public class AsyncNHttpServiceHandler extends AbstractNHttpServiceHandler
             final HttpRequest request) throws IOException, HttpException {
 
         HttpContext context = conn.getContext();
+        ServerConnState connState = (ServerConnState) context.getAttribute(CONN_STATE);
+
         ProtocolVersion ver = request.getRequestLine().getProtocolVersion();
 
         if (!ver.lessEquals(HttpVersion.HTTP_1_1)) {
@@ -351,24 +400,29 @@ public class AsyncNHttpServiceHandler extends AbstractNHttpServiceHandler
             ver = HttpVersion.HTTP_1_1;
         }
 
-        HttpResponse response = this.responseFactory.newHttpResponse(
-                ver,
-                HttpStatus.SC_OK,
-                conn.getContext());
-        response.setParams(
-                new DefaultedHttpParams(response.getParams(), this.params));
-
+        HttpResponse response = null;
         try {
 
             this.httpProcessor.process(request, context);
 
-            NHttpRequestHandler handler = getRequestHandler(request);
+            NHttpRequestHandler handler = connState.getRequestHandler();
             if (handler != null) {
-                handler.handle(request, response, context);
+                response = this.responseFactory.newHttpResponse(
+                        ver, HttpStatus.SC_OK, context);
+                response.setParams(
+                        new DefaultedHttpParams(response.getParams(), this.params));
+
+                handler.handle(
+                        request,
+                        response,
+                        new ResponseTriggerImpl(connState, conn),
+                        context);
             } else {
-                response.setStatusCode(HttpStatus.SC_NOT_IMPLEMENTED);
+                response = this.responseFactory.newHttpResponse(ver,
+                        HttpStatus.SC_NOT_IMPLEMENTED, context);
+                response.setParams(
+                        new DefaultedHttpParams(response.getParams(), this.params));
             }
-            sendResponse(conn, request, response);
 
         } catch (HttpException ex) {
             response = this.responseFactory.newHttpResponse(HttpVersion.HTTP_1_0,
@@ -377,11 +431,17 @@ public class AsyncNHttpServiceHandler extends AbstractNHttpServiceHandler
                     new DefaultedHttpParams(response.getParams(), this.params));
             handleException(ex, response);
         }
+        if (response != null) {
+            connState.setResponse(response);
+            sendResponse(conn, request, response);
+            connState.setHandled(true);
+        }
     }
 
-    private void sendResponse(final NHttpServerConnection conn,
-            HttpRequest request, HttpResponse response) throws IOException,
-            HttpException {
+    private void sendResponse(
+            final NHttpServerConnection conn,
+            final HttpRequest request,
+            final HttpResponse response) throws IOException, HttpException {
         HttpContext context = conn.getContext();
         ServerConnState connState = (ServerConnState) context.getAttribute(CONN_STATE);
 
@@ -426,9 +486,14 @@ public class AsyncNHttpServiceHandler extends AbstractNHttpServiceHandler
 
     protected static class ServerConnState {
 
-        private NHttpRequestHandler requestHandler;
-        private ConsumingNHttpEntity consumingEntity;
-        private ProducingNHttpEntity producingEntity;
+        private volatile NHttpRequestHandler requestHandler;
+        private volatile HttpRequest request;
+        private volatile ConsumingNHttpEntity consumingEntity;
+        private volatile HttpResponse response;
+        private volatile ProducingNHttpEntity producingEntity;
+        private volatile IOException ioex;
+        private volatile HttpException httpex;
+        private volatile boolean handled;
 
         public void finishInput() {
             if (this.consumingEntity != null) {
@@ -446,7 +511,11 @@ public class AsyncNHttpServiceHandler extends AbstractNHttpServiceHandler
 
         public void reset() {
             finishInput();
+            this.request = null;
             finishOutput();
+            this.response = null;
+            this.ioex = null;
+            this.httpex = null;
             this.requestHandler = null;
         }
 
@@ -458,12 +527,12 @@ public class AsyncNHttpServiceHandler extends AbstractNHttpServiceHandler
             this.requestHandler = requestHandler;
         }
 
-        public ProducingNHttpEntity getProducingEntity() {
-            return this.producingEntity;
+        public HttpRequest getRequest() {
+            return this.request;
         }
 
-        public void setProducingEntity(final ProducingNHttpEntity producingEntity) {
-            this.producingEntity = producingEntity;
+        public void setRequest(final HttpRequest request) {
+            this.request = request;
         }
 
         public ConsumingNHttpEntity getConsumingEntity() {
@@ -472,6 +541,91 @@ public class AsyncNHttpServiceHandler extends AbstractNHttpServiceHandler
 
         public void setConsumingEntity(final ConsumingNHttpEntity consumingEntity) {
             this.consumingEntity = consumingEntity;
+        }
+
+        public HttpResponse getResponse() {
+            return this.response;
+        }
+
+        public void setResponse(final HttpResponse response) {
+            this.response = response;
+        }
+
+        public ProducingNHttpEntity getProducingEntity() {
+            return this.producingEntity;
+        }
+
+        public void setProducingEntity(final ProducingNHttpEntity producingEntity) {
+            this.producingEntity = producingEntity;
+        }
+
+        public IOException getIOExepction() {
+            return this.ioex;
+        }
+
+        public void setIOExepction(final IOException ex) {
+            this.ioex = ex;
+        }
+
+        public HttpException getHttpExepction() {
+            return this.httpex;
+        }
+
+        public void setHttpExepction(final HttpException ex) {
+            this.httpex = ex;
+        }
+
+        public boolean isHandled() {
+            return this.handled;
+        }
+
+        public void setHandled(boolean handled) {
+            this.handled = handled;
+        }
+
+    }
+
+    private static class ResponseTriggerImpl implements NHttpResponseTrigger {
+
+        private final ServerConnState connState;
+        private final IOControl iocontrol;
+
+        private volatile boolean triggered;
+
+        public ResponseTriggerImpl(final ServerConnState connState, final IOControl iocontrol) {
+            super();
+            this.connState = connState;
+            this.iocontrol = iocontrol;
+        }
+
+        public void submitResponse(final HttpResponse response) {
+            if (response == null) {
+                throw new IllegalArgumentException("Response may not be null");
+            }
+            if (this.triggered) {
+                throw new IllegalStateException("Response already triggered");
+            }
+            this.triggered = true;
+            this.connState.setResponse(response);
+            this.iocontrol.requestOutput();
+        }
+
+        public void handleException(final HttpException ex) {
+            if (this.triggered) {
+                throw new IllegalStateException("Response already triggered");
+            }
+            this.triggered = true;
+            this.connState.setHttpExepction(ex);
+            this.iocontrol.requestOutput();
+        }
+
+        public void handleException(final IOException ex) {
+            if (this.triggered) {
+                throw new IllegalStateException("Response already triggered");
+            }
+            this.triggered = true;
+            this.connState.setIOExepction(ex);
+            this.iocontrol.requestOutput();
         }
 
     }

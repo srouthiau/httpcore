@@ -237,7 +237,7 @@ public class TestAsyncNHttpHandlers extends TestCase {
             responseData.add(new ByteSequence());
         }
 
-        NHttpRequestHandler requestHandler = new NHttpRequestHandler() {
+        NHttpRequestHandler requestHandler = new SimpleNHttpRequestHandler() {
 
             public ConsumingNHttpEntity entityRequest(
                     HttpEntityEnclosingRequest request, HttpContext context) {
@@ -370,7 +370,7 @@ public class TestAsyncNHttpHandlers extends TestCase {
             responseData.add(new ByteSequence());
         }
 
-        NHttpRequestHandler requestHandler = new NHttpRequestHandler() {
+        NHttpRequestHandler requestHandler = new SimpleNHttpRequestHandler() {
 
             public ConsumingNHttpEntity entityRequest(
                     HttpEntityEnclosingRequest request, HttpContext context)
@@ -507,7 +507,7 @@ public class TestAsyncNHttpHandlers extends TestCase {
             responseData.add(new ByteSequence());
         }
 
-        NHttpRequestHandler requestHandler = new NHttpRequestHandler() {
+        NHttpRequestHandler requestHandler = new SimpleNHttpRequestHandler() {
 
             public ConsumingNHttpEntity entityRequest(
                     HttpEntityEnclosingRequest request, HttpContext context)
@@ -649,7 +649,7 @@ public class TestAsyncNHttpHandlers extends TestCase {
             responseData.add(new ByteSequence());
         }
 
-        NHttpRequestHandler requestHandler = new NHttpRequestHandler() {
+        NHttpRequestHandler requestHandler = new SimpleNHttpRequestHandler() {
 
             public ConsumingNHttpEntity entityRequest(
                     HttpEntityEnclosingRequest request, HttpContext context)
@@ -791,7 +791,7 @@ public class TestAsyncNHttpHandlers extends TestCase {
             responseData.add(new ByteSequence());
         }
 
-        NHttpRequestHandler requestHandler = new NHttpRequestHandler() {
+        NHttpRequestHandler requestHandler = new SimpleNHttpRequestHandler() {
 
             public ConsumingNHttpEntity entityRequest(
                     HttpEntityEnclosingRequest request, HttpContext context)
@@ -926,7 +926,7 @@ public class TestAsyncNHttpHandlers extends TestCase {
         final RequestCount requestCount = new RequestCount(reqNo);
         final ResponseSequence responses = new ResponseSequence();
 
-        NHttpRequestHandler requestHandler = new NHttpRequestHandler() {
+        NHttpRequestHandler requestHandler = new SimpleNHttpRequestHandler() {
 
             public ConsumingNHttpEntity entityRequest(
                     HttpEntityEnclosingRequest request, HttpContext context)
@@ -1084,7 +1084,7 @@ public class TestAsyncNHttpHandlers extends TestCase {
 
         final String[] method = new String[1];
 
-        NHttpRequestHandler requestHandler = new NHttpRequestHandler() {
+        NHttpRequestHandler requestHandler = new SimpleNHttpRequestHandler() {
 
             public ConsumingNHttpEntity entityRequest(
                     HttpEntityEnclosingRequest request, HttpContext context)

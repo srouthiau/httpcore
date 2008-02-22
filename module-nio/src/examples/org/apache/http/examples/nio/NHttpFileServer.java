@@ -61,6 +61,7 @@ import org.apache.http.nio.protocol.AsyncNHttpServiceHandler;
 import org.apache.http.nio.protocol.EventListener;
 import org.apache.http.nio.protocol.NHttpRequestHandler;
 import org.apache.http.nio.protocol.NHttpRequestHandlerResolver;
+import org.apache.http.nio.protocol.SimpleNHttpRequestHandler;
 import org.apache.http.nio.reactor.IOEventDispatch;
 import org.apache.http.nio.reactor.ListeningIOReactor;
 import org.apache.http.params.BasicHttpParams;
@@ -138,7 +139,7 @@ public class NHttpFileServer {
         System.out.println("Shutdown");
     }
 
-    static class HttpFileHandler implements NHttpRequestHandler {
+    static class HttpFileHandler extends SimpleNHttpRequestHandler {
 
         private final String docRoot;
         private final boolean useFileChannels;
@@ -149,8 +150,8 @@ public class NHttpFileServer {
         }
 
         public ConsumingNHttpEntity entityRequest(
-                HttpEntityEnclosingRequest request, HttpContext context)
-                throws HttpException, IOException {
+                final HttpEntityEnclosingRequest request,
+                final HttpContext context) throws HttpException, IOException {
             return new ConsumingNHttpEntityTemplate(
                     request.getEntity(),
                     new FileWriteListener(useFileChannels));
