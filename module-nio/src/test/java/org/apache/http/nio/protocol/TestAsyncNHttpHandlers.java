@@ -50,7 +50,6 @@ import org.apache.http.HttpRequest;
 import org.apache.http.HttpResponse;
 import org.apache.http.HttpStatus;
 import org.apache.http.HttpVersion;
-import org.apache.http.entity.ByteArrayEntity;
 import org.apache.http.impl.DefaultConnectionReuseStrategy;
 import org.apache.http.impl.DefaultHttpResponseFactory;
 import org.apache.http.message.BasicHttpEntityEnclosingRequest;
@@ -202,7 +201,7 @@ public class TestAsyncNHttpHandlers extends TestCase {
     }
 
     private NHttpClientHandler createHttpClientHandler(
-            final HttpRequestExecutionHandler requestExecutionHandler) {
+            final NHttpRequestExecutionHandler requestExecutionHandler) {
         BasicHttpProcessor httpproc = new BasicHttpProcessor();
         httpproc.addInterceptor(new RequestContent());
         httpproc.addInterceptor(new RequestTargetHost());
@@ -210,7 +209,7 @@ public class TestAsyncNHttpHandlers extends TestCase {
         httpproc.addInterceptor(new RequestUserAgent());
         httpproc.addInterceptor(new RequestExpectContinue());
 
-        BufferingHttpClientHandler clientHandler = new BufferingHttpClientHandler(
+        AsyncNHttpClientHandler clientHandler = new AsyncNHttpClientHandler(
                 httpproc,
                 requestExecutionHandler,
                 new DefaultConnectionReuseStrategy(),
@@ -240,13 +239,15 @@ public class TestAsyncNHttpHandlers extends TestCase {
         NHttpRequestHandler requestHandler = new SimpleNHttpRequestHandler() {
 
             public ConsumingNHttpEntity entityRequest(
-                    HttpEntityEnclosingRequest request, HttpContext context) {
+                    final HttpEntityEnclosingRequest request,
+                    final HttpContext context) {
                 return null;
             }
 
             public void handle(
-                    HttpRequest request, HttpResponse response, HttpContext context)
-                    throws HttpException, IOException {
+                    final HttpRequest request,
+                    final HttpResponse response,
+                    final HttpContext context) throws HttpException, IOException {
                 String s = request.getRequestLine().getUri();
                 URI uri;
                 try {
@@ -262,7 +263,7 @@ public class TestAsyncNHttpHandlers extends TestCase {
 
         };
 
-        HttpRequestExecutionHandler requestExecutionHandler = new HttpRequestExecutionHandler() {
+        NHttpRequestExecutionHandler requestExecutionHandler = new NHttpRequestExecutionHandler() {
 
             public void initalizeContext(final HttpContext context, final Object attachment) {
                 context.setAttribute("LIST", (ByteSequence) attachment);
@@ -281,6 +282,13 @@ public class TestAsyncNHttpHandlers extends TestCase {
                     context.setAttribute("REQ-COUNT", new Integer(i + 1));
                 }
                 return get;
+            }
+
+            public ConsumingNHttpEntity responseEntity(
+                    final HttpResponse response,
+                    final HttpContext context) throws IOException {
+                return new BufferingNHttpEntity(response.getEntity(),
+                        new HeapByteBufferAllocator());
             }
 
             public void handleResponse(final HttpResponse response, final HttpContext context) {
@@ -373,16 +381,17 @@ public class TestAsyncNHttpHandlers extends TestCase {
         NHttpRequestHandler requestHandler = new SimpleNHttpRequestHandler() {
 
             public ConsumingNHttpEntity entityRequest(
-                    HttpEntityEnclosingRequest request, HttpContext context)
-                    throws HttpException, IOException {
+                    final HttpEntityEnclosingRequest request,
+                    final HttpContext context) throws HttpException, IOException {
                 return new BufferingNHttpEntity(
                         request.getEntity(),
                         new HeapByteBufferAllocator());
             }
 
             public void handle(
-                    HttpRequest request, HttpResponse response, HttpContext context)
-                    throws HttpException, IOException {
+                    final HttpRequest request,
+                    final HttpResponse response,
+                    final HttpContext context) throws HttpException, IOException {
                 if (request instanceof HttpEntityEnclosingRequest) {
                     HttpEntity entity = ((HttpEntityEnclosingRequest) request).getEntity();
                     byte[] b = EntityUtils.toByteArray(entity);
@@ -394,7 +403,7 @@ public class TestAsyncNHttpHandlers extends TestCase {
             }
         };
 
-        HttpRequestExecutionHandler requestExecutionHandler = new HttpRequestExecutionHandler() {
+        NHttpRequestExecutionHandler requestExecutionHandler = new NHttpRequestExecutionHandler() {
 
             public void initalizeContext(final HttpContext context, final Object attachment) {
                 context.setAttribute("LIST", (ByteSequence) attachment);
@@ -405,6 +414,13 @@ public class TestAsyncNHttpHandlers extends TestCase {
             public void finalizeContext(final HttpContext context) {
             }
 
+            public ConsumingNHttpEntity responseEntity(
+                    final HttpResponse response,
+                    final HttpContext context) throws IOException {
+                return new BufferingNHttpEntity(response.getEntity(),
+                        new HeapByteBufferAllocator());
+            }
+
             public HttpRequest submitRequest(final HttpContext context) {
                 int i = ((Integer) context.getAttribute("REQ-COUNT")).intValue();
                 BasicHttpEntityEnclosingRequest post = null;
@@ -412,7 +428,7 @@ public class TestAsyncNHttpHandlers extends TestCase {
                     post = new BasicHttpEntityEnclosingRequest("POST", "/?" + i);
 
                     byte[] data = requestData.getBytes(i);
-                    ByteArrayEntity outgoing = new ByteArrayEntity(data);
+                    NByteArrayEntity outgoing = new NByteArrayEntity(data);
                     post.setEntity(outgoing);
 
                     context.setAttribute("REQ-COUNT", new Integer(i + 1));
@@ -510,16 +526,17 @@ public class TestAsyncNHttpHandlers extends TestCase {
         NHttpRequestHandler requestHandler = new SimpleNHttpRequestHandler() {
 
             public ConsumingNHttpEntity entityRequest(
-                    HttpEntityEnclosingRequest request, HttpContext context)
-                    throws HttpException, IOException {
+                    final HttpEntityEnclosingRequest request,
+                    final HttpContext context) throws HttpException, IOException {
                 return new BufferingNHttpEntity(
                         request.getEntity(),
                         new HeapByteBufferAllocator());
             }
 
             public void handle(
-                    HttpRequest request, HttpResponse response, HttpContext context)
-                    throws HttpException, IOException {
+                    final HttpRequest request,
+                    final HttpResponse response,
+                    final HttpContext context) throws HttpException, IOException {
                 if (request instanceof HttpEntityEnclosingRequest) {
                     HttpEntity entity = ((HttpEntityEnclosingRequest) request).getEntity();
                     byte[] b = EntityUtils.toByteArray(entity);
@@ -533,7 +550,7 @@ public class TestAsyncNHttpHandlers extends TestCase {
             }
         };
 
-        HttpRequestExecutionHandler requestExecutionHandler = new HttpRequestExecutionHandler() {
+        NHttpRequestExecutionHandler requestExecutionHandler = new NHttpRequestExecutionHandler() {
 
             public void initalizeContext(final HttpContext context, final Object attachment) {
                 context.setAttribute("LIST", (ByteSequence) attachment);
@@ -544,13 +561,20 @@ public class TestAsyncNHttpHandlers extends TestCase {
             public void finalizeContext(final HttpContext context) {
             }
 
+            public ConsumingNHttpEntity responseEntity(
+                    final HttpResponse response,
+                    final HttpContext context) throws IOException {
+                return new BufferingNHttpEntity(response.getEntity(),
+                        new HeapByteBufferAllocator());
+            }
+
             public HttpRequest submitRequest(final HttpContext context) {
                 int i = ((Integer) context.getAttribute("REQ-COUNT")).intValue();
                 BasicHttpEntityEnclosingRequest post = null;
                 if (i < reqNo) {
                     post = new BasicHttpEntityEnclosingRequest("POST", "/?" + i);
                     byte[] data = requestData.getBytes(i);
-                    ByteArrayEntity outgoing = new ByteArrayEntity(data);
+                    NByteArrayEntity outgoing = new NByteArrayEntity(data);
                     outgoing.setChunked(true);
                     post.setEntity(outgoing);
 
@@ -652,16 +676,17 @@ public class TestAsyncNHttpHandlers extends TestCase {
         NHttpRequestHandler requestHandler = new SimpleNHttpRequestHandler() {
 
             public ConsumingNHttpEntity entityRequest(
-                    HttpEntityEnclosingRequest request, HttpContext context)
-                    throws HttpException, IOException {
+                    final HttpEntityEnclosingRequest request,
+                    final HttpContext context) throws HttpException, IOException {
                 return new BufferingNHttpEntity(
                         request.getEntity(),
                         new HeapByteBufferAllocator());
             }
 
             public void handle(
-                    HttpRequest request, HttpResponse response, HttpContext context)
-                    throws HttpException, IOException {
+                    final HttpRequest request,
+                    final HttpResponse response,
+                    final HttpContext context) throws HttpException, IOException {
                 if (request instanceof HttpEntityEnclosingRequest) {
                     HttpEntity entity = ((HttpEntityEnclosingRequest) request).getEntity();
                     byte[] b = EntityUtils.toByteArray(entity);
@@ -679,7 +704,7 @@ public class TestAsyncNHttpHandlers extends TestCase {
         this.client.getParams().setParameter(
                 CoreProtocolPNames.PROTOCOL_VERSION, HttpVersion.HTTP_1_0);
 
-        HttpRequestExecutionHandler requestExecutionHandler = new HttpRequestExecutionHandler() {
+        NHttpRequestExecutionHandler requestExecutionHandler = new NHttpRequestExecutionHandler() {
 
             public void initalizeContext(final HttpContext context, final Object attachment) {
                 context.setAttribute("LIST", (ByteSequence) attachment);
@@ -690,13 +715,20 @@ public class TestAsyncNHttpHandlers extends TestCase {
             public void finalizeContext(final HttpContext context) {
             }
 
+            public ConsumingNHttpEntity responseEntity(
+                    final HttpResponse response,
+                    final HttpContext context) throws IOException {
+                return new BufferingNHttpEntity(response.getEntity(),
+                        new HeapByteBufferAllocator());
+            }
+
             public HttpRequest submitRequest(final HttpContext context) {
                 int i = ((Integer) context.getAttribute("REQ-COUNT")).intValue();
                 BasicHttpEntityEnclosingRequest post = null;
                 if (i < reqNo) {
                     post = new BasicHttpEntityEnclosingRequest("POST", "/?" + i);
                     byte[] data = requestData.getBytes(i);
-                    ByteArrayEntity outgoing = new ByteArrayEntity(data);
+                    NByteArrayEntity outgoing = new NByteArrayEntity(data);
                     post.setEntity(outgoing);
 
                     context.setAttribute("REQ-COUNT", new Integer(i + 1));
@@ -794,16 +826,17 @@ public class TestAsyncNHttpHandlers extends TestCase {
         NHttpRequestHandler requestHandler = new SimpleNHttpRequestHandler() {
 
             public ConsumingNHttpEntity entityRequest(
-                    HttpEntityEnclosingRequest request, HttpContext context)
-                    throws HttpException, IOException {
+                    final HttpEntityEnclosingRequest request,
+                    final HttpContext context) throws HttpException, IOException {
                 return new BufferingNHttpEntity(
                         request.getEntity(),
                         new HeapByteBufferAllocator());
             }
 
             public void handle(
-                    HttpRequest request, HttpResponse response, HttpContext context)
-                    throws HttpException, IOException {
+                    final HttpRequest request,
+                    final HttpResponse response,
+                    final HttpContext context) throws HttpException, IOException {
                 if (request instanceof HttpEntityEnclosingRequest) {
                     HttpEntity entity = ((HttpEntityEnclosingRequest) request).getEntity();
                     byte[] b = EntityUtils.toByteArray(entity);
@@ -820,7 +853,7 @@ public class TestAsyncNHttpHandlers extends TestCase {
         // Activate 'expect: continue' handshake
         this.client.getParams().setBooleanParameter(CoreProtocolPNames.USE_EXPECT_CONTINUE, true);
 
-        HttpRequestExecutionHandler requestExecutionHandler = new HttpRequestExecutionHandler() {
+        NHttpRequestExecutionHandler requestExecutionHandler = new NHttpRequestExecutionHandler() {
 
             public void initalizeContext(final HttpContext context, final Object attachment) {
                 context.setAttribute("LIST", (ByteSequence) attachment);
@@ -831,13 +864,20 @@ public class TestAsyncNHttpHandlers extends TestCase {
             public void finalizeContext(final HttpContext context) {
             }
 
+            public ConsumingNHttpEntity responseEntity(
+                    final HttpResponse response,
+                    final HttpContext context) throws IOException {
+                return new BufferingNHttpEntity(response.getEntity(),
+                        new HeapByteBufferAllocator());
+            }
+
             public HttpRequest submitRequest(final HttpContext context) {
                 int i = ((Integer) context.getAttribute("REQ-COUNT")).intValue();
                 BasicHttpEntityEnclosingRequest post = null;
                 if (i < reqNo) {
                     post = new BasicHttpEntityEnclosingRequest("POST", "/?" + i);
                     byte[] data = requestData.getBytes(i);
-                    ByteArrayEntity outgoing = new ByteArrayEntity(data);
+                    NByteArrayEntity outgoing = new NByteArrayEntity(data);
                     outgoing.setChunked(true);
                     post.setEntity(outgoing);
 
@@ -929,16 +969,17 @@ public class TestAsyncNHttpHandlers extends TestCase {
         NHttpRequestHandler requestHandler = new SimpleNHttpRequestHandler() {
 
             public ConsumingNHttpEntity entityRequest(
-                    HttpEntityEnclosingRequest request, HttpContext context)
-                    throws HttpException, IOException {
+                    final HttpEntityEnclosingRequest request,
+                    final HttpContext context) throws HttpException, IOException {
                 return new BufferingNHttpEntity(
                         request.getEntity(),
                         new HeapByteBufferAllocator());
             }
 
             public void handle(
-                    HttpRequest request, HttpResponse response, HttpContext context)
-                    throws HttpException, IOException {
+                    final HttpRequest request,
+                    final HttpResponse response,
+                    final HttpContext context) throws HttpException, IOException {
                 NStringEntity outgoing = new NStringEntity("No content");
                 response.setEntity(outgoing);
             }
@@ -973,7 +1014,7 @@ public class TestAsyncNHttpHandlers extends TestCase {
         // Activate 'expect: continue' handshake
         this.client.getParams().setBooleanParameter(CoreProtocolPNames.USE_EXPECT_CONTINUE, true);
 
-        HttpRequestExecutionHandler requestExecutionHandler = new HttpRequestExecutionHandler() {
+        NHttpRequestExecutionHandler requestExecutionHandler = new NHttpRequestExecutionHandler() {
 
             public void initalizeContext(final HttpContext context, final Object attachment) {
                 context.setAttribute("LIST", (ResponseSequence) attachment);
@@ -984,13 +1025,20 @@ public class TestAsyncNHttpHandlers extends TestCase {
             public void finalizeContext(final HttpContext context) {
             }
 
+            public ConsumingNHttpEntity responseEntity(
+                    final HttpResponse response,
+                    final HttpContext context) throws IOException {
+                return new BufferingNHttpEntity(response.getEntity(),
+                        new HeapByteBufferAllocator());
+            }
+
             public HttpRequest submitRequest(final HttpContext context) {
                 int i = ((Integer) context.getAttribute("REQ-COUNT")).intValue();
                 BasicHttpEntityEnclosingRequest post = null;
                 if (i < reqNo) {
                     post = new BasicHttpEntityEnclosingRequest("POST", "/");
                     post.addHeader("Secret", Integer.toString(i));
-                    ByteArrayEntity outgoing = new ByteArrayEntity(
+                    NByteArrayEntity outgoing = new NByteArrayEntity(
                             EncodingUtils.getAsciiBytes("No content"));
                     post.setEntity(outgoing);
 
@@ -1011,7 +1059,7 @@ public class TestAsyncNHttpHandlers extends TestCase {
                 HttpEntity entity = response.getEntity();
                 if (entity != null) {
                     try {
-                        entity.consumeContent();
+                        EntityUtils.toByteArray(entity);
                     } catch (IOException ex) {
                         requestCount.abort();
                         return;
@@ -1087,16 +1135,17 @@ public class TestAsyncNHttpHandlers extends TestCase {
         NHttpRequestHandler requestHandler = new SimpleNHttpRequestHandler() {
 
             public ConsumingNHttpEntity entityRequest(
-                    HttpEntityEnclosingRequest request, HttpContext context)
-                    throws HttpException, IOException {
+                    final HttpEntityEnclosingRequest request,
+                    final HttpContext context) throws HttpException, IOException {
                 return new BufferingNHttpEntity(
                         request.getEntity(),
                         new HeapByteBufferAllocator());
             }
 
             public void handle(
-                    HttpRequest request, HttpResponse response, HttpContext context)
-                    throws HttpException, IOException {
+                    final HttpRequest request,
+                    final HttpResponse response,
+                    final HttpContext context) throws HttpException, IOException {
                 String s = request.getRequestLine().getUri();
                 URI uri;
                 try {
@@ -1112,7 +1161,7 @@ public class TestAsyncNHttpHandlers extends TestCase {
 
         };
 
-        HttpRequestExecutionHandler requestExecutionHandler = new HttpRequestExecutionHandler() {
+        NHttpRequestExecutionHandler requestExecutionHandler = new NHttpRequestExecutionHandler() {
 
             public void initalizeContext(final HttpContext context, final Object attachment) {
                 context.setAttribute("LIST", (ResponseSequence) attachment);
@@ -1121,6 +1170,13 @@ public class TestAsyncNHttpHandlers extends TestCase {
             }
 
             public void finalizeContext(final HttpContext context) {
+            }
+
+            public ConsumingNHttpEntity responseEntity(
+                    final HttpResponse response,
+                    final HttpContext context) throws IOException {
+                return new BufferingNHttpEntity(response.getEntity(),
+                        new HeapByteBufferAllocator());
             }
 
             public HttpRequest submitRequest(final HttpContext context) {
