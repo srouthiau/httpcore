@@ -35,10 +35,10 @@ import org.apache.http.params.HttpParams;
 
 /**
  * Utility class for accessing I/O reactor parameters in {@link HttpParams}.
- * 
- * 
+ *
+ *
  * @version $Revision$
- * 
+ *
  * @since 4.0
  *
  * @see NIOReactorPNames
@@ -55,7 +55,7 @@ public final class NIOReactorParams implements NIOReactorPNames {
         }
         return params.getIntParameter(CONTENT_BUFFER_SIZE, 1024);
     }
-    
+
     public static void setContentBufferSize(final HttpParams params, int size) {
         if (params == null) {
             throw new IllegalArgumentException("HTTP parameters may not be null");
@@ -69,7 +69,7 @@ public final class NIOReactorParams implements NIOReactorPNames {
         }
         return params.getLongParameter(SELECT_INTERVAL, 1000);
     }
-    
+
     public static void setSelectInterval(final HttpParams params, long ms) {
         if (params == null) {
             throw new IllegalArgumentException("HTTP parameters may not be null");
@@ -83,12 +83,26 @@ public final class NIOReactorParams implements NIOReactorPNames {
         }
         return params.getLongParameter(GRACE_PERIOD, 500);
     }
-    
+
     public static void setGracePeriod(final HttpParams params, long ms) {
         if (params == null) {
             throw new IllegalArgumentException("HTTP parameters may not be null");
         }
         params.setLongParameter(GRACE_PERIOD, ms);
+    }
+
+    public static boolean getInterestOpsQueueing(final HttpParams params) {
+        if (params == null) {
+            throw new IllegalArgumentException("HTTP parameters may not be null");
+        }
+        return params.getBooleanParameter(INTEREST_OPS_QUEUEING, false);
+    }
+
+    public static void setInterestOpsQueueing(final HttpParams params, boolean interestOpsQueueing) {
+        if (params == null) {
+            throw new IllegalArgumentException("HTTP parameters may not be null");
+        }
+        params.setBooleanParameter(INTEREST_OPS_QUEUEING, interestOpsQueueing);
     }
 
 }

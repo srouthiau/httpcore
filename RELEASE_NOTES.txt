@@ -1,5 +1,8 @@
 Changes since 4.0
 -------------------
+* [HTTPCORE-155] Compatibility mode with IBM JRE and other JREs with naive (broken) implementation 
+  of SelectionKey.
+  Contributed by Marc Beyerle <marc.beyerle at de.ibm.com> 
 
 * [HTTPCORE-191] Blocking HTTP connections are now capable of correctly preserving their internal 
   state on SocketTimeoutExceptions, which makes it possible to continue reading from the connection 
