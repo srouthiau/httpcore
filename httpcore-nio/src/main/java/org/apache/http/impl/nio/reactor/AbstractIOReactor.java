@@ -40,9 +40,11 @@ import java.nio.channels.ClosedSelectorException;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -68,24 +70,28 @@ public abstract class AbstractIOReactor implements IOReactor {
     
     private final Object shutdownMutex;
     private final long selectTimeout;
+    private final boolean interestOpsQueueing;
     private final Selector selector;
     private final Set<IOSession> sessions;
+    private final List<InterestOpEntry> interestOpsQueue;
     private final Queue<IOSession> closedSessions;
     private final Queue<ChannelEntry> newChannels;
-    
+
     /**
      * Creates new AbstractIOReactor instance.
      * 
      * @param selectTimeout the select timeout.
      * @throws IOReactorException in case if a non-recoverable I/O error. 
      */
-    public AbstractIOReactor(long selectTimeout) throws IOReactorException {
+    public AbstractIOReactor(long selectTimeout, boolean interestOpsQueueing) throws IOReactorException {
         super();
         if (selectTimeout <= 0) {
             throw new IllegalArgumentException("Select timeout may not be negative or zero");
         }
         this.selectTimeout = selectTimeout;
+        this.interestOpsQueueing = interestOpsQueueing;
         this.sessions = Collections.synchronizedSet(new HashSet<IOSession>());
+        this.interestOpsQueue = new ArrayList<InterestOpEntry>();
         this.closedSessions = new ConcurrentLinkedQueue<IOSession>();
         this.newChannels = new ConcurrentLinkedQueue<ChannelEntry>();
         try {
@@ -189,6 +195,13 @@ public abstract class AbstractIOReactor implements IOReactor {
     }
 
     /**
+     * Returns <code>true</code> if interest Ops queueing is enabled, <code>false</code> otherwise.
+     */
+    public boolean getInterestOpsQueueing() {
+        return this.interestOpsQueueing;
+    }
+
+    /**
      * Adds new channel entry. The channel will be asynchronously registered
      * with the selector.
      *  
@@ -271,6 +284,11 @@ public abstract class AbstractIOReactor implements IOReactor {
                 if (this.status.compareTo(IOReactorStatus.ACTIVE) > 0 
                         && this.sessions.isEmpty()) {
                     break;
+                }
+
+                if (this.interestOpsQueueing) {
+                    // process all pending interestOps() operations
+                    processPendingInterestOps();
                 }
                 
             }
@@ -363,7 +381,7 @@ public abstract class AbstractIOReactor implements IOReactor {
                     queueClosedSession(session);
                 }
                 
-            });
+            }, this);
             
             int timeout = 0;
             try {
@@ -400,6 +418,40 @@ public abstract class AbstractIOReactor implements IOReactor {
                     sessionClosed(session);
                 } catch (CancelledKeyException ex) {
                     // ignore and move on
+                }
+            }
+        }
+    }
+
+    /**
+        Processes all pending {@link java.nio.channels.SelectionKey#interestOps(int) interestOps(int)}
+        operations.
+    */
+    protected void processPendingInterestOps() {
+        // validity check
+        if (!this.interestOpsQueueing) {
+            return;
+        }
+        synchronized (this.interestOpsQueue) {
+            // determine this interestOps() queue's size
+            int size = this.interestOpsQueue.size();
+
+            for (int i = 0; i < size; i++) {
+                // get the first queue element
+                InterestOpEntry queueElement = this.interestOpsQueue.remove(0);
+
+                // obtain the operation's details
+                IOSessionImpl ioSession = queueElement.getIoSession();
+                int operationType = queueElement.getOperationType();
+                int operationArgument = queueElement.getOperationArgument();
+
+                // perform the operation
+                if (operationType == InterestOpEntry.OPERATION_TYPE_SET_EVENT) {
+                    ioSession.setEventImpl(operationArgument);
+                } else if (operationType == InterestOpEntry.OPERATION_TYPE_CLEAR_EVENT) {
+                    ioSession.clearEventImpl(operationArgument);
+                } else if (operationType == InterestOpEntry.OPERATION_TYPE_SET_EVENT_MASK) {
+                    ioSession.setEventMaskImpl(operationArgument);
                 }
             }
         }
@@ -523,6 +575,45 @@ public abstract class AbstractIOReactor implements IOReactor {
     
     public void shutdown() throws IOReactorException {
         shutdown(1000);
+    }
+
+    /** 
+     * Adds an {@link org.apache.http.impl.nio.reactor.IOSessionQueueElement IOSessionQueueElement}
+     * to the {@link java.nio.channels.SelectionKey#interestOps(int) interestOps(int)} queue for
+     * this instance. 
+     * @return <code>true</code> if the operation could be performed successfully, 
+     *   <code>false</code> otherwise.
+     */
+    protected boolean addInterestOpsQueueElement(final InterestOpEntry entry) {
+        // validity checks
+        if (!this.interestOpsQueueing) {
+            throw new IllegalStateException("Interest ops queueing not enabled");
+        }
+        if (entry == null) {
+            return false;
+        }
+        if (entry.getIoSession() == null) {
+            return false;
+        }
+
+        // local variable
+        int operationType = entry.getOperationType();
+
+        /*
+            NOTE: Most of the operations are setEvent(), so check for this one first.
+        */
+        if ((operationType != InterestOpEntry.OPERATION_TYPE_SET_EVENT) &&
+            (operationType != InterestOpEntry.OPERATION_TYPE_CLEAR_EVENT) &&
+            (operationType != InterestOpEntry.OPERATION_TYPE_SET_EVENT_MASK)) {
+            return false;
+        }
+
+        synchronized (this.interestOpsQueue) {
+            // add this operation to the interestOps() queue
+            this.interestOpsQueue.add(entry);
+        }
+
+        return true;
     }
     
 }
