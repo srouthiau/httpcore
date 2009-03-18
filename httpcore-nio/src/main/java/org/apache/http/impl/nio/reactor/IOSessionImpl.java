@@ -46,51 +46,41 @@ import org.apache.http.nio.reactor.SessionBufferStatus;
 
 /**
  * Default implementation of {@link IOSession}.
- *
+ * 
  *
  * @version $Revision$
  *
  * @since 4.0
  */
 public class IOSessionImpl implements IOSession {
-
+    
     private volatile int status;
-
+    
     private final SelectionKey key;
     private final ByteChannel channel;
     private final SessionClosedCallback callback;
     private final Map<String, Object> attributes;
-    private final boolean interestOpsQueueing;
-    private final AbstractIOReactor abstractIOReactor;
-
+    
     private SessionBufferStatus bufferStatus;
     private int socketTimeout;
-
-    public IOSessionImpl(final SelectionKey key, final SessionClosedCallback callback, final AbstractIOReactor abstractIOReactor) {
+    
+    public IOSessionImpl(final SelectionKey key, final SessionClosedCallback callback) {
         super();
         if (key == null) {
             throw new IllegalArgumentException("Selection key may not be null");
         }
-
-        // validity check
-        if (abstractIOReactor == null) {
-            throw new IllegalArgumentException("IO reactor may not be null");
-        }
-
         this.key = key;
         this.channel = (ByteChannel) this.key.channel();
-        this.abstractIOReactor = abstractIOReactor;
-        this.interestOpsQueueing = abstractIOReactor.getInterestOpsQueueing();
         this.callback = callback;
         this.attributes = Collections.synchronizedMap(new HashMap<String, Object>());
         this.socketTimeout = 0;
         this.status = ACTIVE;
     }
-
+    
     public ByteChannel channel() {
         return this.channel;
     }
-
+    
     public SocketAddress getLocalAddress() {
         Channel channel = this.key.channel();
         if (channel instanceof SocketChannel) {
@@ -110,57 +100,18 @@ public class IOSessionImpl implements IOSession {
     }
 
     public int getEventMask() {
-        if (interestOpsQueueing) {
-            // flush the interestOps() queue
-            abstractIOReactor.processPendingInterestOps();
-        }
-
         return this.key.interestOps();
     }
-
+    
     public void setEventMask(int ops) {
-        if (this.interestOpsQueueing) {
-            // local variable
-            InterestOpEntry queueElement = new InterestOpEntry(this,
-                    InterestOpEntry.OPERATION_TYPE_SET_EVENT_MASK, ops);
-
-            // add this operation to the interestOps() queue
-            this.abstractIOReactor.addInterestOpsQueueElement(queueElement);
-
-            // wake up this key's selector
-            this.key.selector().wakeup();
-        } else {
-            // simply invoke the actual implementation
-            setEventMaskImpl(ops);
-        }
-    }
-
-    protected void setEventMaskImpl(int ops) {
         if (this.status == CLOSED) {
             return;
         }
         this.key.interestOps(ops);
         this.key.selector().wakeup();
     }
-
+    
     public void setEvent(int op) {
-        if (this.interestOpsQueueing) {
-            // local variable
-            InterestOpEntry queueElement = new InterestOpEntry(this,
-                    InterestOpEntry.OPERATION_TYPE_SET_EVENT, op);
-
-            // add this operation to the interestOps() queue
-            this.abstractIOReactor.addInterestOpsQueueElement(queueElement);
-
-            // wake up this key's selector
-            this.key.selector().wakeup();
-        } else {
-            // simply invoke the actual implementation
-            setEventImpl(op);
-        }
-    }
-
-    protected void setEventImpl(int op) {
         if (this.status == CLOSED) {
             return;
         }
@@ -170,24 +121,8 @@ public class IOSessionImpl implements IOSession {
         }
         this.key.selector().wakeup();
     }
-
+    
     public void clearEvent(int op) {
-        if (interestOpsQueueing) {
-            // local variable
-            InterestOpEntry queueElement = new InterestOpEntry(this, InterestOpEntry.OPERATION_TYPE_CLEAR_EVENT, op);
-
-            // add this operation to the interestOps() queue
-            abstractIOReactor.addInterestOpsQueueElement(queueElement);
-
-            // wake up this key's selector
-            this.key.selector().wakeup();
-        } else {
-            // simply invoke the actual implementation
-            clearEventImpl(op);
-        }
-    }
-
-    protected void clearEventImpl(int op) {
         if (this.status == CLOSED) {
             return;
         }
@@ -197,15 +132,15 @@ public class IOSessionImpl implements IOSession {
         }
         this.key.selector().wakeup();
     }
-
+    
     public int getSocketTimeout() {
         return this.socketTimeout;
     }
-
+    
     public void setSocketTimeout(int timeout) {
         this.socketTimeout = timeout;
     }
-
+    
     public void close() {
         if (this.status == CLOSED) {
             return;
@@ -225,7 +160,7 @@ public class IOSessionImpl implements IOSession {
             this.key.selector().wakeup();
         }
     }
-
+    
     public int getStatus() {
         return this.status;
     }
@@ -233,17 +168,17 @@ public class IOSessionImpl implements IOSession {
     public boolean isClosed() {
         return this.status == CLOSED || !this.key.isValid();
     }
-
+    
     public void shutdown() {
         // For this type of session, a close() does exactly
         // what we need and nothing more.
         close();
     }
-
+    
     public boolean hasBufferedInput() {
         return this.bufferStatus != null && this.bufferStatus.hasBufferedInput();
     }
-
+    
     public boolean hasBufferedOutput() {
         return this.bufferStatus != null && this.bufferStatus.hasBufferedOutput();
     }
@@ -251,7 +186,7 @@ public class IOSessionImpl implements IOSession {
     public void setBufferStatus(final SessionBufferStatus bufferStatus) {
         this.bufferStatus = bufferStatus;
     }
-
+    
     public Object getAttribute(final String name) {
         return this.attributes.get(name);
     }
@@ -280,19 +215,13 @@ public class IOSessionImpl implements IOSession {
         }
         buffer.append(']');
     }
-
+    
     @Override
     public String toString() {
         StringBuffer buffer = new StringBuffer();
         buffer.append("[");
         if (this.key.isValid()) {
             buffer.append("interested ops: ");
-
-            if (interestOpsQueueing) {
-                // flush the interestOps() queue
-                abstractIOReactor.processPendingInterestOps();
-            }
-
             formatOps(buffer, this.key.interestOps());
             buffer.append("; ready ops: ");
             formatOps(buffer, this.key.readyOps());
