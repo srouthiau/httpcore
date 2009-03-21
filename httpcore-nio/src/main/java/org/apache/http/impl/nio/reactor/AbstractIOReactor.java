@@ -427,7 +427,7 @@ public abstract class AbstractIOReactor implements IOReactor {
         Processes all pending {@link java.nio.channels.SelectionKey#interestOps(int) interestOps(int)}
         operations.
     */
-    protected void processPendingInterestOps() {
+    private void processPendingInterestOps() {
         // validity check
         if (!this.interestOpsQueueing) {
             return;
@@ -442,17 +442,10 @@ public abstract class AbstractIOReactor implements IOReactor {
 
                 // obtain the operation's details
                 IOSessionImpl ioSession = queueElement.getIoSession();
-                int operationType = queueElement.getOperationType();
-                int operationArgument = queueElement.getOperationArgument();
+                int eventMask = queueElement.getEventMask();
 
                 // perform the operation
-                if (operationType == InterestOpEntry.OPERATION_TYPE_SET_EVENT) {
-                    ioSession.setEventImpl(operationArgument);
-                } else if (operationType == InterestOpEntry.OPERATION_TYPE_CLEAR_EVENT) {
-                    ioSession.clearEventImpl(operationArgument);
-                } else if (operationType == InterestOpEntry.OPERATION_TYPE_SET_EVENT_MASK) {
-                    ioSession.setEventMaskImpl(operationArgument);
-                }
+                ioSession.applyEventMask(eventMask);
             }
         }
     }
@@ -593,18 +586,6 @@ public abstract class AbstractIOReactor implements IOReactor {
             return false;
         }
         if (entry.getIoSession() == null) {
-            return false;
-        }
-
-        // local variable
-        int operationType = entry.getOperationType();
-
-        /*
-            NOTE: Most of the operations are setEvent(), so check for this one first.
-        */
-        if ((operationType != InterestOpEntry.OPERATION_TYPE_SET_EVENT) &&
-            (operationType != InterestOpEntry.OPERATION_TYPE_CLEAR_EVENT) &&
-            (operationType != InterestOpEntry.OPERATION_TYPE_SET_EVENT_MASK)) {
             return false;
         }
 

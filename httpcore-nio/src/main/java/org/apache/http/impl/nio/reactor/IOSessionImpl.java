@@ -65,6 +65,7 @@ public class IOSessionImpl implements IOSession {
     
     private SessionBufferStatus bufferStatus;
     private int socketTimeout;
+    private volatile int currentEventMask;
     
     public IOSessionImpl(final SelectionKey key, final SessionClosedCallback callback, final AbstractIOReactor abstractIOReactor) {
         super();
@@ -83,6 +84,7 @@ public class IOSessionImpl implements IOSession {
         this.attributes = Collections.synchronizedMap(new HashMap<String, Object>());
         this.abstractIOReactor = abstractIOReactor;
         this.interestOpsQueueing = abstractIOReactor.getInterestOpsQueueing();
+        this.currentEventMask = 0;
         this.socketTimeout = 0;
         this.status = ACTIVE;
     }
@@ -110,93 +112,77 @@ public class IOSessionImpl implements IOSession {
     }
 
     public int getEventMask() {
-        if (interestOpsQueueing) {
-            // flush the interestOps() queue
-            abstractIOReactor.processPendingInterestOps();
-        }
-
-        return this.key.interestOps();
+        return this.interestOpsQueueing ? this.currentEventMask : this.key.interestOps();
     }
     
     public void setEventMask(int ops) {
+        if (this.status == CLOSED) {
+            return;
+        }
         if (this.interestOpsQueueing) {
+            // update the current event mask
+            this.currentEventMask = ops;
+
             // local variable
-            InterestOpEntry entry = new InterestOpEntry(
-                    this, InterestOpEntry.OPERATION_TYPE_SET_EVENT_MASK, ops);
+            InterestOpEntry entry = new InterestOpEntry(this, this.currentEventMask);
 
             // add this operation to the interestOps() queue
             this.abstractIOReactor.addInterestOpsQueueElement(entry);
-
-            // wake up this key's selector
-            this.key.selector().wakeup();
         } else {
-            // simply invoke the actual implementation
-            setEventMaskImpl(ops);
+            this.key.interestOps(ops);
         }
+        this.key.selector().wakeup();
     }
 
-    protected void setEventMaskImpl(int ops) {
+    public void setEvent(int op) {
+        if (this.status == CLOSED) {
+            return;
+        }
+        if (this.interestOpsQueueing) {
+            // update the current event mask
+            this.currentEventMask |= op;
+
+            // local variable
+            InterestOpEntry entry = new InterestOpEntry(this, this.currentEventMask);
+
+            // add this operation to the interestOps() queue
+            this.abstractIOReactor.addInterestOpsQueueElement(entry);
+        } else {
+            synchronized (this.key) {
+                int ops = this.key.interestOps();
+                this.key.interestOps(ops | op);
+            }
+        }
+        this.key.selector().wakeup();
+    }
+
+    public void clearEvent(int op) {
+        if (this.status == CLOSED) {
+            return;
+        }
+        if (this.interestOpsQueueing) {
+            // update the current event mask
+            this.currentEventMask &= ~op;
+
+            // local variable
+            InterestOpEntry entry = new InterestOpEntry(this, this.currentEventMask);
+
+            // add this operation to the interestOps() queue
+            this.abstractIOReactor.addInterestOpsQueueElement(entry);
+        } else {
+            synchronized (this.key) {
+                int ops = this.key.interestOps();
+                this.key.interestOps(ops & ~op);
+            }
+        }
+        this.key.selector().wakeup();
+    }
+
+    protected void applyEventMask(int ops) {
         if (this.status == CLOSED) {
             return;
         }
         this.key.interestOps(ops);
-        this.key.selector().wakeup();
-    }
-    
-    public void setEvent(int op) {
-        if (this.interestOpsQueueing) {
-            // local variable
-            InterestOpEntry entry = new InterestOpEntry(this, 
-                    InterestOpEntry.OPERATION_TYPE_SET_EVENT, op);
-
-            // add this operation to the interestOps() queue
-            this.abstractIOReactor.addInterestOpsQueueElement(entry);
-
-            // wake up this key's selector
-            this.key.selector().wakeup();
-        } else {
-            // simply invoke the actual implementation
-            setEventImpl(op);
-        }
-    }
-
-    protected void setEventImpl(int op) {
-        if (this.status == CLOSED) {
-            return;
-        }
-        synchronized (this.key) {
-            int ops = this.key.interestOps();
-            this.key.interestOps(ops | op);
-        }
-        this.key.selector().wakeup();
-    }
-    
-    public void clearEvent(int op) {
-        if (this.interestOpsQueueing) {
-            // local variable
-            InterestOpEntry entry = new InterestOpEntry(this, 
-                    InterestOpEntry.OPERATION_TYPE_CLEAR_EVENT, op);
-
-            // add this operation to the interestOps() queue
-            this.abstractIOReactor.addInterestOpsQueueElement(entry);
-
-            // wake up this key's selector
-            this.key.selector().wakeup();
-        } else {
-            // simply invoke the actual implementation
-            clearEventImpl(op);
-        }
-    }
-
-    protected void clearEventImpl(int op) {
-        if (this.status == CLOSED) {
-            return;
-        }
-        synchronized (this.key) {
-            int ops = this.key.interestOps();
-            this.key.interestOps(ops & ~op);
-        }
-        this.key.selector().wakeup();
     }
     
     public int getSocketTimeout() {
@@ -288,13 +274,8 @@ public class IOSessionImpl implements IOSession {
         buffer.append("[");
         if (this.key.isValid()) {
             buffer.append("interested ops: ");
-
-            if (interestOpsQueueing) {
-                // flush the interestOps() queue
-                abstractIOReactor.processPendingInterestOps();
-            }
-
-            formatOps(buffer, this.key.interestOps());
+            formatOps(buffer, this.interestOpsQueueing ? 
+                    this.currentEventMask : this.key.interestOps());
             buffer.append("; ready ops: ");
             formatOps(buffer, this.key.readyOps());
         } else {

@@ -37,33 +37,21 @@ package org.apache.http.impl.nio.reactor;
  */
 class InterestOpEntry {
 
-    public static final int OPERATION_TYPE_SET_EVENT_MASK = 0;
-
-    public static final int OPERATION_TYPE_SET_EVENT = 1;
-
-    public static final int OPERATION_TYPE_CLEAR_EVENT = 2;
-
     private final IOSessionImpl ioSession;
-    private final int operationType;
-    private final int operationArgument;
+    private final int eventMask;
 
-    public InterestOpEntry(IOSessionImpl ioSession, int operationType, int operationArgument) {
+    public InterestOpEntry(IOSessionImpl ioSession, int eventMask) {
         // initialize instance members
         this.ioSession = ioSession;
-        this.operationType = operationType;
-        this.operationArgument = operationArgument;
+        this.eventMask = eventMask;
     }
 
     public IOSessionImpl getIoSession() {
         return ioSession;
     }
 
-    public int getOperationType() {
-        return operationType;
-    }
-
-    public int getOperationArgument() {
-        return operationArgument;
+    public int getEventMask() {
+        return eventMask;
     }
 
 }
