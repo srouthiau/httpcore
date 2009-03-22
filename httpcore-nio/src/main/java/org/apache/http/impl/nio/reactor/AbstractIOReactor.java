@@ -40,11 +40,9 @@ import java.nio.channels.ClosedSelectorException;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -73,7 +71,7 @@ public abstract class AbstractIOReactor implements IOReactor {
     private final boolean interestOpsQueueing;
     private final Selector selector;
     private final Set<IOSession> sessions;
-    private final List<InterestOpEntry> interestOpsQueue;
+    private final Queue<InterestOpEntry> interestOpsQueue;
     private final Queue<IOSession> closedSessions;
     private final Queue<ChannelEntry> newChannels;
 
@@ -91,7 +89,7 @@ public abstract class AbstractIOReactor implements IOReactor {
         this.selectTimeout = selectTimeout;
         this.interestOpsQueueing = interestOpsQueueing;
         this.sessions = Collections.synchronizedSet(new HashSet<IOSession>());
-        this.interestOpsQueue = new ArrayList<InterestOpEntry>();
+        this.interestOpsQueue = new ConcurrentLinkedQueue<InterestOpEntry>();
         this.closedSessions = new ConcurrentLinkedQueue<IOSession>();
         this.newChannels = new ConcurrentLinkedQueue<ChannelEntry>();
         try {
@@ -433,19 +431,16 @@ public abstract class AbstractIOReactor implements IOReactor {
             return;
         }
         synchronized (this.interestOpsQueue) {
-            // determine this interestOps() queue's size
-            int size = this.interestOpsQueue.size();
-
-            for (int i = 0; i < size; i++) {
+            while (!this.interestOpsQueue.isEmpty()) {
                 // get the first queue element
-                InterestOpEntry queueElement = this.interestOpsQueue.remove(0);
+                InterestOpEntry entry = this.interestOpsQueue.remove();
 
                 // obtain the operation's details
-                IOSessionImpl ioSession = queueElement.getIoSession();
-                int eventMask = queueElement.getEventMask();
-
-                // perform the operation
-                ioSession.applyEventMask(eventMask);
+                SelectionKey key = entry.getSelectionKey();
+                int eventMask = entry.getEventMask();
+                if (key.isValid()) {
+                    key.interestOps(eventMask);
+                }
             }
         }
     }
@@ -583,9 +578,6 @@ public abstract class AbstractIOReactor implements IOReactor {
             throw new IllegalStateException("Interest ops queueing not enabled");
         }
         if (entry == null) {
-            return false;
-        }
-        if (entry.getIoSession() == null) {
             return false;
         }
 

@@ -31,27 +31,42 @@
 
 package org.apache.http.impl.nio.reactor;
 
+import java.nio.channels.SelectionKey;
+
 /**
  * Helper class, representing an element on an {@link java.nio.channels.SelectionKey#interestOps(int) 
  * interestOps(int)} queue.
  */
 class InterestOpEntry {
 
-    private final IOSessionImpl ioSession;
+    private final SelectionKey key;
     private final int eventMask;
 
-    public InterestOpEntry(IOSessionImpl ioSession, int eventMask) {
-        // initialize instance members
-        this.ioSession = ioSession;
+    public InterestOpEntry(final SelectionKey key, int eventMask) {
+        super();
+        if (key == null) {
+            throw new IllegalArgumentException("Selection key may not be null");
+        }
+        this.key = key;
         this.eventMask = eventMask;
     }
 
-    public IOSessionImpl getIoSession() {
-        return ioSession;
+    public SelectionKey getSelectionKey() {
+        return this.key;
     }
 
     public int getEventMask() {
-        return eventMask;
+        return this.eventMask;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        return this.key.equals(obj);
+    }
+
+    @Override
+    public int hashCode() {
+        return this.key.hashCode();
     }
 
 }

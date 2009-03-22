@@ -124,7 +124,7 @@ public class IOSessionImpl implements IOSession {
             this.currentEventMask = ops;
 
             // local variable
-            InterestOpEntry entry = new InterestOpEntry(this, this.currentEventMask);
+            InterestOpEntry entry = new InterestOpEntry(this.key, this.currentEventMask);
 
             // add this operation to the interestOps() queue
             this.abstractIOReactor.addInterestOpsQueueElement(entry);
@@ -143,7 +143,7 @@ public class IOSessionImpl implements IOSession {
             this.currentEventMask |= op;
 
             // local variable
-            InterestOpEntry entry = new InterestOpEntry(this, this.currentEventMask);
+            InterestOpEntry entry = new InterestOpEntry(this.key, this.currentEventMask);
 
             // add this operation to the interestOps() queue
             this.abstractIOReactor.addInterestOpsQueueElement(entry);
@@ -165,7 +165,7 @@ public class IOSessionImpl implements IOSession {
             this.currentEventMask &= ~op;
 
             // local variable
-            InterestOpEntry entry = new InterestOpEntry(this, this.currentEventMask);
+            InterestOpEntry entry = new InterestOpEntry(this.key, this.currentEventMask);
 
             // add this operation to the interestOps() queue
             this.abstractIOReactor.addInterestOpsQueueElement(entry);
@@ -178,13 +178,6 @@ public class IOSessionImpl implements IOSession {
         this.key.selector().wakeup();
     }
 
-    protected void applyEventMask(int ops) {
-        if (this.status == CLOSED) {
-            return;
-        }
-        this.key.interestOps(ops);
-    }
-    
     public int getSocketTimeout() {
         return this.socketTimeout;
     }
