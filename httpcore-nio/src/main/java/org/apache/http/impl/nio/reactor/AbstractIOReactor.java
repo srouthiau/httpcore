@@ -373,13 +373,26 @@ public abstract class AbstractIOReactor implements IOReactor {
                         "with the selector", ex);
             }
 
-            IOSession session = new IOSessionImpl(key, new SessionClosedCallback() {
+            SessionClosedCallback sessionClosedCallback = new SessionClosedCallback() {
 
                 public void sessionClosed(IOSession session) {
                     queueClosedSession(session);
                 }
                 
-            }, this);
+            };
+            
+            InterestOpsCallback interestOpsCallback = null;
+            if (this.interestOpsQueueing) {
+                interestOpsCallback = new InterestOpsCallback() {
+
+                    public void addInterestOps(InterestOpEntry entry) {
+                        queueInterestOps(entry);
+                    }
+                    
+                };
+            }
+            
+            IOSession session = new IOSessionImpl(key, interestOpsCallback, sessionClosedCallback);
             
             int timeout = 0;
             try {
@@ -572,7 +585,7 @@ public abstract class AbstractIOReactor implements IOReactor {
      * @return <code>true</code> if the operation could be performed successfully, 
      *   <code>false</code> otherwise.
      */
-    protected boolean addInterestOpsQueueElement(final InterestOpEntry entry) {
+    protected boolean queueInterestOps(final InterestOpEntry entry) {
         // validity checks
         if (!this.interestOpsQueueing) {
             throw new IllegalStateException("Interest ops queueing not enabled");

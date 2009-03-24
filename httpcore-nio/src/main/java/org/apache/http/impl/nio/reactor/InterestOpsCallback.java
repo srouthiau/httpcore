@@ -31,42 +31,14 @@
 
 package org.apache.http.impl.nio.reactor;
 
-import java.nio.channels.SelectionKey;
-
 /**
- * Helper class, representing an entry on an {@link java.nio.channels.SelectionKey#interestOps(int) 
- * interestOps(int)} queue.
+ * Callback interface used internally by I/O session implementations to delegate execution 
+ * of a {@link java.nio.channels.SelectionKey#interestOps(int)} operation to the I/O reactor.
+ *
+ * @since 4.1
  */
-public class InterestOpEntry {
+public interface InterestOpsCallback {
 
-    private final SelectionKey key;
-    private final int eventMask;
-
-    public InterestOpEntry(final SelectionKey key, int eventMask) {
-        super();
-        if (key == null) {
-            throw new IllegalArgumentException("Selection key may not be null");
-        }
-        this.key = key;
-        this.eventMask = eventMask;
-    }
-
-    public SelectionKey getSelectionKey() {
-        return this.key;
-    }
-
-    public int getEventMask() {
-        return this.eventMask;
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-        return this.key.equals(obj);
-    }
-
-    @Override
-    public int hashCode() {
-        return this.key.hashCode();
-    }
-
+    void addInterestOps(InterestOpEntry entry);
+    
 }

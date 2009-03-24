@@ -58,35 +58,36 @@ public class IOSessionImpl implements IOSession {
     
     private final SelectionKey key;
     private final ByteChannel channel;
-    private final SessionClosedCallback callback;
     private final Map<String, Object> attributes;
-    private final AbstractIOReactor abstractIOReactor;
-    private final boolean interestOpsQueueing;
+    private final InterestOpsCallback interestOpsCallback;
+    private final SessionClosedCallback sessionClosedCallback;
     
     private SessionBufferStatus bufferStatus;
     private int socketTimeout;
     private volatile int currentEventMask;
     
-    public IOSessionImpl(final SelectionKey key, final SessionClosedCallback callback, final AbstractIOReactor abstractIOReactor) {
+    public IOSessionImpl(
+            final SelectionKey key, 
+            final InterestOpsCallback interestOpsCallback,
+            final SessionClosedCallback sessionClosedCallback) {
         super();
         if (key == null) {
             throw new IllegalArgumentException("Selection key may not be null");
         }
-
-        // validity check
-        if (abstractIOReactor == null) {
-            throw new IllegalArgumentException("IO reactor may not be null");
-        }
-
         this.key = key;
         this.channel = (ByteChannel) this.key.channel();
-        this.callback = callback;
+        this.interestOpsCallback = interestOpsCallback;
+        this.sessionClosedCallback = sessionClosedCallback;
         this.attributes = Collections.synchronizedMap(new HashMap<String, Object>());
-        this.abstractIOReactor = abstractIOReactor;
-        this.interestOpsQueueing = abstractIOReactor.getInterestOpsQueueing();
         this.currentEventMask = 0;
         this.socketTimeout = 0;
         this.status = ACTIVE;
+    }
+    
+    public IOSessionImpl(
+            final SelectionKey key, 
+            final SessionClosedCallback sessionClosedCallback) {
+        this(key, null, sessionClosedCallback);
     }
     
     public ByteChannel channel() {
@@ -112,14 +113,14 @@ public class IOSessionImpl implements IOSession {
     }
 
     public int getEventMask() {
-        return this.interestOpsQueueing ? this.currentEventMask : this.key.interestOps();
+        return this.interestOpsCallback != null ? this.currentEventMask : this.key.interestOps();
     }
     
     public void setEventMask(int ops) {
         if (this.status == CLOSED) {
             return;
         }
-        if (this.interestOpsQueueing) {
+        if (this.interestOpsCallback != null) {
             // update the current event mask
             this.currentEventMask = ops;
 
@@ -127,7 +128,7 @@ public class IOSessionImpl implements IOSession {
             InterestOpEntry entry = new InterestOpEntry(this.key, this.currentEventMask);
 
             // add this operation to the interestOps() queue
-            this.abstractIOReactor.addInterestOpsQueueElement(entry);
+            this.interestOpsCallback.addInterestOps(entry);
         } else {
             this.key.interestOps(ops);
         }
@@ -138,7 +139,7 @@ public class IOSessionImpl implements IOSession {
         if (this.status == CLOSED) {
             return;
         }
-        if (this.interestOpsQueueing) {
+        if (this.interestOpsCallback != null) {
             // update the current event mask
             this.currentEventMask |= op;
 
@@ -146,7 +147,7 @@ public class IOSessionImpl implements IOSession {
             InterestOpEntry entry = new InterestOpEntry(this.key, this.currentEventMask);
 
             // add this operation to the interestOps() queue
-            this.abstractIOReactor.addInterestOpsQueueElement(entry);
+            this.interestOpsCallback.addInterestOps(entry);
         } else {
             synchronized (this.key) {
                 int ops = this.key.interestOps();
@@ -160,7 +161,7 @@ public class IOSessionImpl implements IOSession {
         if (this.status == CLOSED) {
             return;
         }
-        if (this.interestOpsQueueing) {
+        if (this.interestOpsCallback != null) {
             // update the current event mask
             this.currentEventMask &= ~op;
 
@@ -168,7 +169,7 @@ public class IOSessionImpl implements IOSession {
             InterestOpEntry entry = new InterestOpEntry(this.key, this.currentEventMask);
 
             // add this operation to the interestOps() queue
-            this.abstractIOReactor.addInterestOpsQueueElement(entry);
+            this.interestOpsCallback.addInterestOps(entry);
         } else {
             synchronized (this.key) {
                 int ops = this.key.interestOps();
@@ -198,8 +199,8 @@ public class IOSessionImpl implements IOSession {
             // Munching exceptions is not nice
             // but in this case it is justified
         }
-        if (this.callback != null) {
-            this.callback.sessionClosed(this);
+        if (this.sessionClosedCallback != null) {
+            this.sessionClosedCallback.sessionClosed(this);
         }
         if (this.key.selector().isOpen()) {
             this.key.selector().wakeup();
@@ -267,7 +268,7 @@ public class IOSessionImpl implements IOSession {
         buffer.append("[");
         if (this.key.isValid()) {
             buffer.append("interested ops: ");
-            formatOps(buffer, this.interestOpsQueueing ? 
+            formatOps(buffer, this.interestOpsCallback != null ? 
                     this.currentEventMask : this.key.interestOps());
             buffer.append("; ready ops: ");
             formatOps(buffer, this.key.readyOps());
