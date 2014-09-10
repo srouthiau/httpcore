@@ -227,7 +227,7 @@ public class DefaultConnectingIOReactor extends AbstractMultiworkerIOReactor
         final SessionRequestImpl sessionRequest = new SessionRequestImpl(
                 remoteAddress, localAddress, attachment, callback);
         sessionRequest.setConnectTimeout(this.config.getConnectTimeout());
-
+        callback.initiated(sessionRequest) ;
         this.requestQueue.add(sessionRequest);
         this.selector.wakeup();
 
@@ -259,17 +259,16 @@ public class DefaultConnectingIOReactor extends AbstractMultiworkerIOReactor
                 throw new IOReactorException("Failure opening socket", ex);
             }
             try {
+                socketChannel.configureBlocking(false);
                 validateAddress(request.getLocalAddress());
                 validateAddress(request.getRemoteAddress());
-
-                socketChannel.configureBlocking(false);
-                prepareSocket(socketChannel.socket());
 
                 if (request.getLocalAddress() != null) {
                     final Socket sock = socketChannel.socket();
                     sock.setReuseAddress(this.config.isSoReuseAddress());
                     sock.bind(request.getLocalAddress());
                 }
+                prepareSocket(socketChannel.socket());
                 final boolean connected = socketChannel.connect(request.getRemoteAddress());
                 if (connected) {
                     final ChannelEntry entry = new ChannelEntry(socketChannel, request);
