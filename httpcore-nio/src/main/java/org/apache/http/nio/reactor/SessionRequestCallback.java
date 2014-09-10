@@ -27,6 +27,7 @@
 
 package org.apache.http.nio.reactor;
 
+
 /**
  * SessionRequestCallback interface can be used to get notifications of
  * completion of session requests asynchronously without having to wait
@@ -67,5 +68,7 @@ public interface SessionRequestCallback {
      * @param request session request.
      */
     void cancelled(SessionRequest request);
+
+    void initiated(SessionRequest sessionRequest);
 
 }
